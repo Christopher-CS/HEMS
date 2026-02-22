@@ -1,0 +1,1 @@
+Interfaces for shared types and states between frontends and backend.
