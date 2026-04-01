@@ -1,20 +1,25 @@
 import { Tabs } from 'expo-router';
 import { Home, Library, Settings, Tv } from 'lucide-react-native';
+import COLORS from '../constants/Colors';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 
 export default function Layout() {
+  const insets = useSafeAreaInsets();
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
         tabBarStyle: {
-          backgroundColor: '#12131D',
-          borderTopColor: '#1E1F2E',
-          height: 90,
-          paddingBottom: 8,
+          backgroundColor: COLORS.background,
+          borderTopColor: COLORS.surface,
+          height: 70 + insets.bottom,
+          paddingBottom: insets.bottom > 0 ? insets.bottom : 8,
           paddingTop: 8,
         },
-        tabBarActiveTintColor: '#4C65E4',
-        tabBarInactiveTintColor: '#62667E',
+        tabBarActiveTintColor: COLORS.accent,
+        tabBarInactiveTintColor: COLORS.muted,
       }}
     >
       <Tabs.Screen
