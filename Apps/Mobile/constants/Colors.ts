@@ -18,20 +18,19 @@ const COLORS = {
   orangeSoft: 'rgba(237, 164, 65, 0.1)',
   purple: '#8E52D5',
   purpleSoft: 'rgba(142, 82, 213, 0.15)',
-  blueSoft: 'rgba(76, 101, 228, 0.15)',
-  // Device Specific
+  overlay: 'rgba(23, 30, 71, 0.5)',
+  overlayDark: 'rgba(0, 0, 0, 0.6)',
+  whiteSoft: 'rgba(255, 255, 255, 0.3)',
+  textBlue: '#BAC4F9',
+  textMutedLight: '#9E9EA5', blueSoft: 'rgba(76, 101, 228, 0.15)',
+
+  // Control Room Devices
   tv: '#6C82F7',
   tvMuted: '#3e489dff',
   light: '#EDA441',
   lightMuted: '#754b11ff',
   speaker: '#BA82F7',
   speakerMuted: '#5b358cff',
-  // Overlays & Special
-  overlay: 'rgba(23, 30, 71, 0.5)',
-  overlayDark: 'rgba(0, 0, 0, 0.6)',
-  whiteSoft: 'rgba(255, 255, 255, 0.3)',
-  textBlue: '#BAC4F9',
-  textMutedLight: '#9E9EA5',
 };
 
 export default COLORS;

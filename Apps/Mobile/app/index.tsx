@@ -25,7 +25,7 @@ export default function Home() {
 
       <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
 
-        {/* Scenes Section */}
+        {/* Scenes */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Scenes</Text>
           <TouchableOpacity onPress={() => console.log('Edit Scenes pressed')}>
@@ -34,7 +34,7 @@ export default function Home() {
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scenesScroll}>
-          {/* Theater Scene */}
+          {/* Theater Preset*/}
           <TouchableOpacity style={styles.sceneCard} onPress={() => console.log('Theater Scene pressed')}>
             <Image
               source={{ uri: 'https://images.unsplash.com/photo-1595769816263-9b910be24d5f?q=80&w=400&auto=format&fit=crop' }}
@@ -56,7 +56,7 @@ export default function Home() {
             </View>
           </TouchableOpacity>
 
-          {/* Party Scene */}
+          {/* Party Preset */}
           <TouchableOpacity style={styles.sceneCard} onPress={() => console.log('Party Scene pressed')}>
             <Image
               source={{ uri: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=400&auto=format&fit=crop' }}
