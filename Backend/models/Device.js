@@ -1,7 +1,6 @@
 import mongoose from 'mongoose';
 
 const deviceSchema = new mongoose.Schema({
-    _id: { type: String, required: true },
     name: { type: String, required: true },
     owner: { type: String, required: true, ref: 'User' },
 
