@@ -40,6 +40,7 @@ export interface RecentMediaRef {
   category: MediaCategory;
   title: string;
   subtitle: string;
+  durationSeconds: number;
   artworkUrl?: string;
   progress?: number;
 }

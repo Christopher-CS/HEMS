@@ -163,7 +163,11 @@ export default function LibraryHub() {
                 (media) => media.category === 'movies'
               );
               if (firstMovieRecent) {
-                emitLibraryCommand('PLAY', firstMovieRecent);
+                emitLibraryCommand(
+                  'PLAY',
+                  firstMovieRecent,
+                  firstMovieRecent.durationSeconds
+                );
               }
             }}
           />
@@ -225,7 +229,7 @@ function RecentCard({ recent }: { recent: RecentMediaRef }) {
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Resume ${recent.title}`}
-      onPress={() => emitLibraryCommand('PLAY', recent)}
+      onPress={() => emitLibraryCommand('PLAY', recent, recent.durationSeconds)}
       style={({ pressed }) => [styles.recentCard, pressed && styles.pressed]}
     >
       <View style={styles.recentArtworkWrap}>

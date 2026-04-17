@@ -77,6 +77,7 @@ export default function MusicPage() {
       <FlatList
         horizontal
         showsHorizontalScrollIndicator={false}
+        style={styles.chipsList}
         contentContainerStyle={styles.chipsRow}
         data={genres}
         keyExtractor={(g) => g}
@@ -143,10 +144,15 @@ const styles = StyleSheet.create({
     fontSize: 14,
     paddingVertical: 0,
   },
+  chipsList: {
+    flexGrow: 0,
+    flexShrink: 0,
+  },
   chipsRow: {
     paddingHorizontal: 20,
     paddingBottom: 14,
     gap: 8,
+    alignItems: 'center',
   },
   chip: {
     paddingHorizontal: 14,
