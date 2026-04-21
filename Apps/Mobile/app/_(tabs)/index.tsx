@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { StyleSheet, Text, View, ScrollView, TouchableOpacity, Switch, Dimensions } from 'react-native';
-import { Bell, Clapperboard, Music, Tv, Lightbulb, Speaker, Volume1, Volume2 } from 'lucide-react-native';
+import { Clapperboard, Music, Tv, Lightbulb, Speaker, Volume1, Volume2 } from 'lucide-react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import Slider from '@react-native-community/slider';
+import TopBar from '../components/TopBar';
+import COLORS from '../constants/Colors';
 
 const { width } = Dimensions.get('window');
 
@@ -18,38 +20,22 @@ export default function Home() {
 
   return (
     <View style={[styles.container, { paddingTop: insets.top }]}>
-      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View style={styles.header}>
-          <View style={styles.userInfo}>
-            <View style={styles.avatarContainer}>
-              <View style={styles.avatarPlaceholder}>
-                <View style={styles.avatarHead} />
-                <View style={styles.avatarBody} />
-              </View>
-              <View style={styles.onlineDot} />
-            </View>
-            <View>
-              <Text style={styles.welcomeText}>WELCOME BACK</Text>
-              <Text style={styles.userName}>Dad</Text>
-            </View>
-          </View>
-          <TouchableOpacity style={styles.bellButton}>
-            <Bell color="#FFFFFF" size={24} />
-          </TouchableOpacity>
-        </View>
+      {/* Header */}
+      <TopBar />
 
-        {/* Scenes Section */}
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+
+        {/* Scenes */}
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Scenes</Text>
-          <TouchableOpacity>
+          <TouchableOpacity onPress={() => console.log('Edit Scenes pressed')}>
             <Text style={styles.editButton}>Edit</Text>
           </TouchableOpacity>
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.scenesScroll}>
-          {/* Theater Scene */}
-          <TouchableOpacity style={styles.sceneCard}>
+          {/* Theater Preset*/}
+          <TouchableOpacity style={styles.sceneCard} onPress={() => console.log('Theater Scene pressed')}>
             <Image
               source={{ uri: 'https://images.unsplash.com/photo-1595769816263-9b910be24d5f?q=80&w=400&auto=format&fit=crop' }}
               style={styles.sceneBgImage}
@@ -58,20 +44,20 @@ export default function Home() {
             <View style={styles.sceneOverlay} />
             <View style={styles.sceneTopRight}>
               <View style={styles.sceneIconWrap}>
-                <Clapperboard color="#FFFFFF" size={18} />
+                <Clapperboard color={COLORS.text} size={18} />
               </View>
             </View>
             <View style={styles.sceneBottom}>
               <Text style={styles.sceneName}>Theater</Text>
               <View style={styles.sceneStatus}>
-                <View style={[styles.statusDot, { backgroundColor: '#4C65E4' }]} />
+                <View style={[styles.statusDot, { backgroundColor: COLORS.accent }]} />
                 <Text style={styles.sceneSubtext}>Active</Text>
               </View>
             </View>
           </TouchableOpacity>
 
-          {/* Party Scene */}
-          <TouchableOpacity style={styles.sceneCard}>
+          {/* Party Preset */}
+          <TouchableOpacity style={styles.sceneCard} onPress={() => console.log('Party Scene pressed')}>
             <Image
               source={{ uri: 'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=400&auto=format&fit=crop' }}
               style={styles.sceneBgImage}
@@ -79,7 +65,7 @@ export default function Home() {
             />
             <View style={styles.sceneOverlayBlack} />
             <View style={styles.sceneTopRight}>
-              <Music color="#FFFFFF" size={20} />
+              <Music color={COLORS.text} size={20} />
             </View>
             <View style={styles.sceneBottom}>
               <Text style={styles.sceneName}>Party</Text>
@@ -98,7 +84,7 @@ export default function Home() {
           <View style={styles.controlCard}>
             <View style={styles.controlCardMain}>
               <View style={styles.controlIconWrapBlue}>
-                <Tv color={tvEnabled ? "#6C82F7" : "#3e489dff"} size={24} />
+                <Tv color={tvEnabled ? COLORS.tv : COLORS.tvMuted} size={24} />
               </View>
               <View style={styles.controlTextContent}>
                 <Text style={styles.controlTitle}>Living Room TV</Text>
@@ -106,9 +92,12 @@ export default function Home() {
               </View>
               <Switch
                 value={tvEnabled}
-                onValueChange={setTvEnabled}
-                trackColor={{ false: '#2D2E41', true: '#4C65E4' }}
-                thumbColor="#FFFFFF"
+                onValueChange={(val) => {
+                  console.log(`Living Room TV toggle: ${val}`);
+                  setTvEnabled(val);
+                }}
+                trackColor={{ false: COLORS.surfaceAlt, true: COLORS.accent }}
+                thumbColor={COLORS.text}
               />
             </View>
             <View style={styles.sliderSection}>
@@ -121,10 +110,13 @@ export default function Home() {
                 minimumValue={0}
                 maximumValue={100}
                 value={volume}
-                onValueChange={setVolume}
-                minimumTrackTintColor={tvEnabled ? "#4C65E4" : "#2D2E41"}
-                maximumTrackTintColor="#2D2E41"
-                thumbTintColor="#FFFFFF"
+                onValueChange={(val) => {
+                  console.log(`Living Room TV volume changed: ${val}%`);
+                  setVolume(val);
+                }}
+                minimumTrackTintColor={tvEnabled ? COLORS.accent : COLORS.surfaceAlt}
+                maximumTrackTintColor={COLORS.surfaceAlt}
+                thumbTintColor={COLORS.text}
                 step={1}
               />
             </View>
@@ -134,7 +126,7 @@ export default function Home() {
           <View style={styles.controlCard}>
             <View style={styles.controlCardMain}>
               <View style={styles.controlIconWrapOrange}>
-                <Lightbulb color={ambianceEnabled ? "#EDA441" : "#754b11ff"} size={24} />
+                <Lightbulb color={ambianceEnabled ? COLORS.light : COLORS.lightMuted} size={24} />
               </View>
               <View style={styles.controlTextContent}>
                 <Text style={styles.controlTitle}>Ambiance</Text>
@@ -142,9 +134,12 @@ export default function Home() {
               </View>
               <Switch
                 value={ambianceEnabled}
-                onValueChange={setAmbianceEnabled}
-                trackColor={{ false: '#2D2E41', true: '#EDA441' }}
-                thumbColor="#FFFFFF"
+                onValueChange={(val) => {
+                  console.log(`Ambiance toggle: ${val}`);
+                  setAmbianceEnabled(val);
+                }}
+                trackColor={{ false: COLORS.surfaceAlt, true: COLORS.orange }}
+                thumbColor={COLORS.text}
               />
             </View>
             <View style={styles.sliderSection}>
@@ -157,10 +152,13 @@ export default function Home() {
                 minimumValue={0}
                 maximumValue={100}
                 value={brightness}
-                onValueChange={setBrightness}
-                minimumTrackTintColor={ambianceEnabled ? "#EDA441" : "#2D2E41"}
-                maximumTrackTintColor="#2D2E41"
-                thumbTintColor="#FFFFFF"
+                onValueChange={(val) => {
+                  console.log(`Ambiance brightness changed: ${val}%`);
+                  setBrightness(val);
+                }}
+                minimumTrackTintColor={ambianceEnabled ? COLORS.orange : COLORS.surfaceAlt}
+                maximumTrackTintColor={COLORS.surfaceAlt}
+                thumbTintColor={COLORS.text}
                 step={1}
               />
             </View>
@@ -170,7 +168,7 @@ export default function Home() {
           <View style={styles.controlCard}>
             <View style={styles.controlCardMain}>
               <View style={styles.controlIconWrapPurple}>
-                <Speaker color={soundEnabled ? "#BA82F7" : "#5b358cff"} size={24} />
+                <Speaker color={soundEnabled ? COLORS.speaker : COLORS.speakerMuted} size={24} />
               </View>
               <View style={styles.controlTextContent}>
                 <Text style={styles.controlTitle}>Sound System</Text>
@@ -178,9 +176,12 @@ export default function Home() {
               </View>
               <Switch
                 value={soundEnabled}
-                onValueChange={setSoundEnabled}
-                trackColor={{ false: '#2D2E41', true: '#8E52D5' }}
-                thumbColor="#FFFFFF"
+                onValueChange={(val) => {
+                  console.log(`Sound System toggle: ${val}`);
+                  setSoundEnabled(val);
+                }}
+                trackColor={{ false: COLORS.surfaceAlt, true: COLORS.accentSoft }}
+                thumbColor={COLORS.text}
               />
             </View>
             <View style={styles.sliderSection}>
@@ -189,19 +190,22 @@ export default function Home() {
                 <Text style={styles.sliderValue}>{soundVolume}%</Text>
               </View>
               <View style={[styles.sliderSection, styles.sliderSectionWithIcons]}>
-                <Volume1 color="#62667E" size={20} />
+                <Volume1 color={COLORS.muted} size={20} />
                 <Slider
                   style={{ height: 40, flex: 1, marginHorizontal: 8 }}
                   minimumValue={0}
                   maximumValue={100}
                   value={soundVolume}
-                  onValueChange={setSoundVolume}
-                  minimumTrackTintColor={soundEnabled ? "#8E52D5" : "#2D2E41"}
-                  maximumTrackTintColor="#2D2E41"
-                  thumbTintColor="#FFFFFF"
+                  onValueChange={(val) => {
+                    console.log(`Sound System volume changed: ${val}%`);
+                    setSoundVolume(val);
+                  }}
+                  minimumTrackTintColor={soundEnabled ? COLORS.accentSoft : COLORS.surfaceAlt}
+                  maximumTrackTintColor={COLORS.surfaceAlt}
+                  thumbTintColor={COLORS.text}
                   step={1}
                 />
-                <Volume2 color="#62667E" size={20} />
+                <Volume2 color={COLORS.muted} size={20} />
               </View>
             </View>
           </View>
@@ -214,99 +218,25 @@ export default function Home() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#12131D',
+    backgroundColor: COLORS.background,
   },
   scrollContent: {
     paddingBottom: 40,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-    marginTop: 10,
-    marginBottom: 32,
-  },
-  userInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  avatarContainer: {
-    marginRight: 12,
-    position: 'relative',
-  },
-  avatarPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#374187',
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-    overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: '#4C65E4',
-  },
-  avatarHead: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: '#56609C',
-    position: 'absolute',
-    top: 8,
-  },
-  avatarBody: {
-    width: 44,
-    height: 22,
-    backgroundColor: '#56609C',
-    borderTopLeftRadius: 22,
-    borderTopRightRadius: 22,
-    position: 'absolute',
-    bottom: -5,
-  },
-  onlineDot: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-    width: 14,
-    height: 14,
-    borderRadius: 7,
-    backgroundColor: '#4CAF50',
-    borderWidth: 2,
-    borderColor: '#12131D',
-  },
-  welcomeText: {
-    color: '#62667E',
-    fontSize: 11,
-    fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  userName: {
-    color: '#FFFFFF',
-    fontSize: 22,
-    fontWeight: '700',
-  },
-  bellButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 20,
-    marginBottom: 16,
+    marginVertical: 16,
   },
   sectionTitle: {
-    color: '#FFFFFF',
+    color: COLORS.text,
     fontSize: 18,
     fontWeight: '700',
   },
   editButton: {
-    color: '#4C65E4',
+    color: COLORS.accent,
     fontSize: 14,
     fontWeight: '600',
   },
@@ -329,11 +259,11 @@ const styles = StyleSheet.create({
   },
   sceneOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(23, 30, 71, 0.5)',
+    backgroundColor: COLORS.overlay,
   },
   sceneOverlayBlack: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+    backgroundColor: COLORS.overlayDark,
   },
   sceneTopRight: {
     position: 'absolute',
@@ -344,7 +274,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    backgroundColor: COLORS.whiteSoft,
     justifyContent: 'center',
     alignItems: 'center',
   },
@@ -354,7 +284,7 @@ const styles = StyleSheet.create({
     left: 16,
   },
   sceneName: {
-    color: '#FFFFFF',
+    color: COLORS.text,
     fontSize: 18,
     fontWeight: '700',
     marginBottom: 6,
@@ -370,12 +300,12 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   sceneSubtext: {
-    color: '#BAC4F9',
+    color: COLORS.textBlue,
     fontSize: 13,
     fontWeight: '500',
   },
   sceneSubtextPlain: {
-    color: '#9E9EA5',
+    color: COLORS.textMutedLight,
     fontSize: 13,
     fontWeight: '500',
   },
@@ -383,7 +313,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
   },
   controlCard: {
-    backgroundColor: '#1E1F2E',
+    backgroundColor: COLORS.surface,
     borderRadius: 20,
     padding: 20,
     marginBottom: 16,
@@ -397,7 +327,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(76, 101, 228, 0.15)',
+    backgroundColor: COLORS.blueSoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -406,7 +336,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(237, 164, 65, 0.1)',
+    backgroundColor: COLORS.orangeSoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -415,7 +345,7 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(142, 82, 213, 0.15)',
+    backgroundColor: COLORS.purpleSoft,
     justifyContent: 'center',
     alignItems: 'center',
     marginRight: 16,
@@ -424,13 +354,13 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   controlTitle: {
-    color: '#FFFFFF',
+    color: COLORS.text,
     fontSize: 16,
     fontWeight: '700',
     marginBottom: 4,
   },
   controlSubtitle: {
-    color: '#62667E',
+    color: COLORS.muted,
     fontSize: 13,
   },
   sliderSection: {
@@ -442,18 +372,18 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   sliderLabel: {
-    color: '#62667E',
+    color: COLORS.muted,
     fontSize: 13,
     fontWeight: '500',
   },
   sliderValue: {
-    color: '#62667E',
+    color: COLORS.muted,
     fontSize: 13,
     fontWeight: '500',
   },
   sliderTrack: {
     height: 8,
-    backgroundColor: '#2D2E41',
+    backgroundColor: COLORS.surfaceAlt,
     borderRadius: 4,
     overflow: 'hidden',
   },

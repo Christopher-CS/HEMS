@@ -1,0 +1,36 @@
+const COLORS = {
+  background: '#12131D',
+  surface: '#1E1F2E',
+  surfaceAlt: '#2D2E41',
+  divider: '#2D2E41',
+  text: '#FFFFFF',
+  muted: '#62667E',
+  centerDot: '#FFFFFFFF',
+  accent: '#4C65E4',
+  accentSoft: '#374BBB',
+  accentMuted: '#56609C',
+  accentDeep: '#374187',
+  danger: '#F35757',
+  track: '#2D2E41',
+  online: '#4CAF50',
+  shadow: 'rgba(0, 0, 0, 0.4)',
+  orange: '#EDA441',
+  orangeSoft: 'rgba(237, 164, 65, 0.1)',
+  purple: '#8E52D5',
+  purpleSoft: 'rgba(142, 82, 213, 0.15)',
+  overlay: 'rgba(23, 30, 71, 0.5)',
+  overlayDark: 'rgba(0, 0, 0, 0.6)',
+  whiteSoft: 'rgba(255, 255, 255, 0.3)',
+  textBlue: '#BAC4F9',
+  textMutedLight: '#9E9EA5', blueSoft: 'rgba(76, 101, 228, 0.15)',
+
+  // Control Room Devices
+  tv: '#6C82F7',
+  tvMuted: '#3e489dff',
+  light: '#EDA441',
+  lightMuted: '#754b11ff',
+  speaker: '#BA82F7',
+  speakerMuted: '#5b358cff',
+};
+
+export default COLORS;
