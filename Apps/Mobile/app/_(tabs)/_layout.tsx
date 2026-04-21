@@ -1,6 +1,6 @@
 import React, { useContext, useEffect } from 'react'
 import { Tabs } from 'expo-router'
-import { AuthContext } from '../_layout'
+import AuthContext from '../_layout'
 import { View, Text } from 'react-native'
 import { useRouter } from 'expo-router'
 

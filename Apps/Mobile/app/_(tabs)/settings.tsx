@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
-import COLORS from '../constants/Colors';
+import COLORS from '../../constants/Colors';
 
 export default function Settings() {
     return (

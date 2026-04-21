@@ -1,6 +1,6 @@
 import React, { useContext } from 'react'
 import { Slot } from 'expo-router'
-import { AuthContext } from '../_layout'
+import AuthContext from '../_layout'
 
 export default function AuthLayout() {
   const { isSignedIn } = useContext(AuthContext)

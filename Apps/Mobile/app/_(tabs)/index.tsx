@@ -4,8 +4,8 @@ import { Clapperboard, Music, Tv, Lightbulb, Speaker, Volume1, Volume2 } from 'l
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Image } from 'expo-image';
 import Slider from '@react-native-community/slider';
-import TopBar from '../components/TopBar';
-import COLORS from '../constants/Colors';
+import TopBar from '../../components/TopBar';
+import COLORS from '../../constants/Colors';
 
 const { width } = Dimensions.get('window');
 

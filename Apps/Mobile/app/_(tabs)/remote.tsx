@@ -2,9 +2,9 @@ import Slider from '@react-native-community/slider';
 import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Home, Pause, Power, Radio, } from 'lucide-react-native';
 import React, { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, } from 'react-native';
-import TopBar from '../components/TopBar';
+import TopBar from '../../components/TopBar';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import COLORS from '../constants/Colors';
+import COLORS from '../../constants/Colors';
 
 const PLAYER_DURATION = 192;
 const INITIAL_POSITION = 65;
