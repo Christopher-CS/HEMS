@@ -1,9 +1,8 @@
 import mongoose from 'mongoose';
 
 const commandSchema = new mongoose.Schema({
-    _id: {type: String, required: true},
-    device: { type: String, ref: 'Device', required: true },
-    issuedBy: { type: String, ref: 'User', required: true },
+    device: { type: mongoose.Schema.Types.ObjectId, ref: 'Device', required: true },
+    issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Profile', required: true },
     type: { type: String, required: true },
     payload: { type: mongoose.Schema.Types.Mixed },
     status: {
