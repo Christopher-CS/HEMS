@@ -1,10 +1,18 @@
 import express from 'express';
 import {
-    addProfile
-} from '../controllers/profileController.js'
+  createProfile,
+  getProfiles,
+  getProfile,
+  updateProfile,
+  deleteProfile,
+} from '../controllers/profileController.js';
 
 const profileRouter = express.Router();
 
-profileRouter.post('/add', addProfile)
+profileRouter.post('/',     createProfile);
+profileRouter.get('/',      getProfiles);
+profileRouter.get('/:id',   getProfile);
+profileRouter.put('/:id',   updateProfile);
+profileRouter.delete('/:id',deleteProfile);
 
-export default profileRouter
+export default profileRouter;
