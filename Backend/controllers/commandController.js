@@ -1,7 +1,7 @@
 import Command from '../models/Command.js'
 import Device from '../models/Device.js'
 
-const capabilityMap = {
+export const capabilityMap = {
     // existing
     power:        "powerable",
     togglePower:  "powerable",
@@ -18,7 +18,7 @@ const capabilityMap = {
     navigate:     "navigatable",
 };
 
-const payloadValidators = {
+export const payloadValidators = {
     // existing
     power: (payload) => {
         if (!["on", "off", "standby"].includes(payload?.powerState))
@@ -66,7 +66,7 @@ const payloadValidators = {
   },
 };
 
-const applyPayload = {
+export const applyPayload = {
     // existing
     power:     (payload, device) => { device.powerState = payload.powerState; },
     togglePower: (_, device) => {

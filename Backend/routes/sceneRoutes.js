@@ -7,7 +7,7 @@ import {
     deleteScene,
     executeScene,
     deactivateScene
-} from '../controllers/sceneController'
+} from '../controllers/sceneController.js'
 
 const sceneRouter = express.Router();
 

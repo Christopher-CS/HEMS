@@ -1,7 +1,7 @@
 import express from 'express';
 import {
     executeCommand
-} from '../controllers/commandController'
+} from '../controllers/commandController.js'
 
 const commandRouter = express.Router();
 
