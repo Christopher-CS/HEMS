@@ -1,30 +1,28 @@
+import type {
+  ConsoleCommandEnvelope,
+  LibraryCommandToken,
+} from '../services/transport/types';
 import type { LibraryActionType, MediaItem, RecentMediaRef } from '../types/media';
 
-export type LibraryCommandPayload = {
-  type: 'ConsoleCommand';
-  deviceId: 'living-room-tv';
-  command: string;
-  mediaId: string;
-  category: MediaItem['category'];
-  metadata?: {
-    title: string;
-    subtitle?: string;
-    durationSeconds?: number;
-  };
+const TOKEN_BY_ACTION: Record<LibraryActionType, LibraryCommandToken> = {
+  PLAY: 'LIBRARY_PLAY',
+  QUEUE: 'LIBRARY_QUEUE',
+  PREVIEW: 'LIBRARY_PREVIEW',
 };
 
-// Keeps selection semantics aligned with the Command Pattern enforced by the
-// backend and Unity simulation. The UI never mutates device state; it only
-// produces a payload that the backend can map to a concrete ICommand.
+// Pure builder: turns a UI library action into the canonical command envelope
+// the backend (or mock transport) will execute. UI screens should import this
+// instead of crafting envelopes themselves so the wire shape stays single-sourced.
 export function buildLibraryCommand(
   action: LibraryActionType,
   item: MediaItem | RecentMediaRef,
+  deviceId: string,
   durationSeconds?: number
-): LibraryCommandPayload {
+): ConsoleCommandEnvelope {
   return {
     type: 'ConsoleCommand',
-    deviceId: 'living-room-tv',
-    command: `LIBRARY_${action}`,
+    deviceId,
+    command: TOKEN_BY_ACTION[action],
     mediaId: item.id,
     category: item.category,
     metadata: {
@@ -33,18 +31,4 @@ export function buildLibraryCommand(
       durationSeconds,
     },
   };
-}
-
-export function emitLibraryCommand(
-  action: LibraryActionType,
-  item: MediaItem | RecentMediaRef,
-  durationSeconds?: number
-): LibraryCommandPayload {
-  const payload = buildLibraryCommand(action, item, durationSeconds);
-
-  // Socket transport is intentionally not wired here yet. When the socket
-  // client is introduced, swap this log for a single emit call.
-  console.log('library-command', JSON.stringify(payload));
-
-  return payload;
 }
