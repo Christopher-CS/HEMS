@@ -2,21 +2,18 @@
 
 This document describes how to connect the **Apps/Mobile** app to the presumed **Backend** so that all local-first features remain available while using the server as the source of truth for reads, writes, and real-time updates.
 
-It is grounded in the state of the repo on the **`Chris`** branch (mobile fully local-first; backend on that branch was minimal at time of writing) and the unmerged **`dev-matt-backend`** branch (devices, profiles, scenes, commands over HTTP). Merge and extend as described below.
-
 ---
 
-## 0. Prerequisites & branch strategy
+## 0. Prerequisites & repo baseline
 
 ### 0.1 Branch baseline
 
-- **`Chris` (current)**: Mobile app is local-first with mock/HTTP/socket layers, repositories, and domain stores.
-- **`dev-matt-backend` (unmerged)**: Adds `controllers/{device,command,profile,scene}Controller.js`, `routes/*`, `models/{Profile,Scene}.js`, and wires them in `server.js`. Controllers assume `req.user._id` but ship **no auth middleware** and **no socket layer**.
-- **Assumption**: One merge of **`dev-matt-backend` into `Chris` (or `main`)** with conflict resolution on `server.js`, `package.json`, and models. Everything below is incremental on that merge.
+- **`main` (current)**: Canonical branch for integration work. It carries the **Apps/Mobile** local-first stack (mock/HTTP/socket, repositories, domain stores) and the evolving **Backend** (Express + Mongoose). Treat **`main`** as the integration target unless your team explicitly branches from elsewhere.
+- **Historical note**: Fuller REST controllers (`controllers/{device,command,profile,scene}Controller.js`), plural `/api/*` routers, `Profile` / `Scene` models, and related wiring landed via the **`dev-matt-backend`** lineage and are expected to be present on **`main`**—not described here as “unmerged.” Remaining gaps called out below (e.g. **`devAuth`**, **Socket.io**, **`/api/library`**, schema alignment with mobile) are **incremental on `main`**, not pre-merge steps between branches.
 
 ### 0.2 Decisions to lock first (small, reversible)
 
-1. **Device ID type**: Prefer **string `_id`** end-to-end (mobile already uses slugs like `light-office-…`). After merge, remove or fix any controller code that assumes Mongo `ObjectId` for device/owner everywhere.
+1. **Device ID type**: Prefer **string `_id`** end-to-end (mobile already uses slugs like `light-office-…`). Remove or fix any controller code that assumes Mongo `ObjectId` for device/owner everywhere.
 2. **Auth for v1**: Add a **`devAuth` middleware** that sets `req.user = { _id: process.env.DEV_USER_ID }` for all `/api` routes. Replace with Clerk/JWT in a later phase.
 3. **Transport split**: **HTTP** for CRUD + initial reads; **Socket.io** for low-latency commands and live `device:state` pushes (mobile already expects a socket path when `transportMode === 'socket'`).
 4. **Source of truth**: **Backend wins**. Mobile may update optimistically; **reconcile** when the server echoes state (HTTP response or socket `device:state`).
@@ -50,7 +47,7 @@ Mobile and backend should implement the same contract. Suggested locations: `Bac
 | `POST` | `/commands` | Single command over HTTP (fallback when socket down) |
 | `GET` | `/library` | Media catalog |
 
-**Note:** Mobile HTTP clients already target **`/api/devices`** and **`/api/library`**. Backend routes on `dev-matt-backend` use singular paths (`/api/device`, etc.); **standardize on plural** to match the app.
+**Note:** Mobile HTTP clients already target **`/api/devices`** and **`/api/library`**. If any backend revision still uses singular paths (`/api/device`, etc.), **standardize on plural** to match the app.
 
 ### 1.2 Socket.io
 
@@ -209,8 +206,8 @@ Extend **`mappers.ts`** so `mapDevice` maps server device → full `DeviceSnapsh
 
 **Phase A — Backend stand-up**
 
-1. Merge `dev-matt-backend`.
-2. Add `devAuth`, plural routes, library route, schema fixes, `runCommand` extraction.
+1. Confirm **`main`** has the REST baseline (devices, profiles, scenes, commands); reconcile route prefixes with mobile (`/api/devices`, plural paths).
+2. Add `devAuth`, plural routes where missing, library route, schema fixes, `runCommand` extraction.
 3. Add Socket.io + `command:issue` handler + `device:state` broadcast.
 4. Seeds + manual `curl`/socket smoke.
 
@@ -263,3 +260,4 @@ Extend **`mappers.ts`** so `mapDevice` maps server device → full `DeviceSnapsh
 ## Document history
 
 - **Created**: Integration plan distilled from implementation discussion; intended to stay in version control for sharing with teammates and tracking execution.
+- **Updated**: Baseline clarified—**`main`** is the canonical integration branch; **`dev-matt-backend`** referenced only as historical lineage for REST controllers/models, not as an unmerged prerequisite.
