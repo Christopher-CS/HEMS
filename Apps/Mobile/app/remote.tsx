@@ -1,20 +1,23 @@
 import Slider from '@react-native-community/slider';
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Home, Pause, Power, Radio, } from 'lucide-react-native';
-import React, { useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View, } from 'react-native';
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Home, Pause, Play, Power, Radio, } from 'lucide-react-native';
+import React, { useCallback, useState } from 'react';
+import { Pressable, StyleSheet, Text, View, } from 'react-native';
 import TopBar from '../components/TopBar';
+import StatusBanner from '../components/StatusBanner';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import COLORS from '../constants/Colors';
+import { useDevices } from '../hooks/useDevices';
+import { useLatestCommand } from '../hooks/useLatestCommand';
+import { usePlayback } from '../hooks/usePlayback';
+import { useTransport } from '../hooks/useTransport';
+import type {
+  ConsoleCommandEnvelope,
+  ConsoleCommandToken,
+} from '../services/transport/types';
 
-const PLAYER_DURATION = 192;
-const INITIAL_POSITION = 65;
-
-type RemoteCommandPayload = {
-  type: 'ConsoleCommand';
-  deviceId: 'living-room-tv';
-  command: string;
-  value?: number;
-};
+const FALLBACK_DURATION = 192;
+const FALLBACK_TITLE = 'Nothing playing';
+const FALLBACK_SUBTITLE = 'Send something from Library';
 
 function formatTime(totalSeconds: number) {
   const safeSeconds = Math.max(0, Math.floor(totalSeconds));
@@ -25,18 +28,44 @@ function formatTime(totalSeconds: number) {
 }
 
 export default function Remote() {
-  const [playbackPosition, setPlaybackPosition] = useState(INITIAL_POSITION);
+  const { primaryDeviceId } = useDevices();
+  const { nowPlaying, setPosition, setPlaying } = usePlayback();
+  const { send } = useTransport();
+  const latest = useLatestCommand();
 
-  const emitRemoteCommand = (command: string, value?: number) => {
-    const payload: RemoteCommandPayload = {
-      type: 'ConsoleCommand',
-      deviceId: 'living-room-tv',
-      command,
-      value,
-    };
+  const duration = nowPlaying?.durationSeconds ?? FALLBACK_DURATION;
+  const [scrubPosition, setScrubPosition] = useState<number | null>(null);
+  const displayedPosition = scrubPosition ?? nowPlaying?.positionSeconds ?? 0;
+  const isPlaying = nowPlaying?.isPlaying ?? false;
 
-    // Keep the remote actions decoupled from execution details until the socket transport is wired in.
-    console.log('remote-command', JSON.stringify(payload));
+  const emitRemoteCommand = useCallback(
+    (command: ConsoleCommandToken, value?: number) => {
+      const envelope: ConsoleCommandEnvelope = {
+        type: 'ConsoleCommand',
+        deviceId: primaryDeviceId,
+        command,
+        value,
+      };
+      send(envelope).catch(() => {});
+    },
+    [primaryDeviceId, send]
+  );
+
+  const handlePauseOrPlay = () => {
+    if (isPlaying) {
+      setPlaying(false);
+      emitRemoteCommand('PAUSE');
+    } else {
+      setPlaying(true);
+      emitRemoteCommand('PLAY');
+    }
+  };
+
+  const handleSeekComplete = (value: number) => {
+    const rounded = Math.round(value);
+    setPosition(rounded);
+    setScrubPosition(null);
+    emitRemoteCommand('SEEK_TO', rounded);
   };
 
   return (
@@ -44,10 +73,16 @@ export default function Remote() {
       <SafeAreaView style={styles.safeArea} edges={['top', 'left', 'right']}>
         <TopBar />
 
-        {/* Remote Body Content */}
+        {latest && !latest.result.ok && (
+          <StatusBanner
+            tone="error"
+            title={`${latest.envelope.command} failed`}
+            detail={latest.result.error}
+          />
+        )}
+
         <View style={styles.remoteContent}>
 
-          {/* Button Group 1 */}
           <View style={styles.buttonGroup1}>
             <View style={styles.cornerButtonTopLeft}>
               <RoundButton
@@ -76,22 +111,35 @@ export default function Remote() {
             </View>
             <View style={styles.cornerButtonBottomRight}>
               <RoundButton
-                accessibilityLabel="Pause playback"
-                onPress={() => emitRemoteCommand('PAUSE')}
+                accessibilityLabel={isPlaying ? 'Pause playback' : 'Resume playback'}
+                onPress={handlePauseOrPlay}
               >
-                <Pause color={COLORS.text} size={26} strokeWidth={2.4} />
+                {isPlaying ? (
+                  <Pause color={COLORS.text} size={26} strokeWidth={2.4} />
+                ) : (
+                  <Play color={COLORS.text} size={26} strokeWidth={2.4} />
+                )}
               </RoundButton>
             </View>
 
             <View style={styles.dpadCenterContainer}>
               <DirectionalPad
-                onDirectionPress={(direction) => emitRemoteCommand(`DPAD_${direction}`)}
+                onDirectionPress={(direction) => {
+                  const token: ConsoleCommandToken =
+                    direction === 'UP'
+                      ? 'DPAD_UP'
+                      : direction === 'DOWN'
+                      ? 'DPAD_DOWN'
+                      : direction === 'LEFT'
+                      ? 'DPAD_LEFT'
+                      : 'DPAD_RIGHT';
+                  emitRemoteCommand(token);
+                }}
                 onCenterPress={() => emitRemoteCommand('DPAD_SELECT')}
               />
             </View>
           </View>
 
-          {/* Button Group 2 */}
           <View style={styles.buttonGroup2}>
             <VerticalStepControl
               topLabel="˄"
@@ -123,16 +171,15 @@ export default function Remote() {
             />
           </View>
 
-          {/* Now Playing */}
           <View style={styles.nowPlayingCard}>
             <View style={styles.nowPlayingHeader}>
               <View style={styles.artwork} />
               <View style={styles.trackTextWrap}>
                 <Text numberOfLines={1} style={styles.trackTitle}>
-                  Song Name
+                  {nowPlaying?.title ?? FALLBACK_TITLE}
                 </Text>
                 <Text numberOfLines={1} style={styles.trackArtist}>
-                  Artist
+                  {nowPlaying?.subtitle ?? FALLBACK_SUBTITLE}
                 </Text>
               </View>
             </View>
@@ -140,25 +187,32 @@ export default function Remote() {
             <Slider
               style={styles.slider}
               minimumValue={0}
-              maximumValue={PLAYER_DURATION}
-              value={playbackPosition}
+              maximumValue={duration}
+              value={displayedPosition}
               minimumTrackTintColor={COLORS.accent}
               maximumTrackTintColor={COLORS.track}
               thumbTintColor={COLORS.accent}
-              onValueChange={setPlaybackPosition}
-              onSlidingComplete={(value) => emitRemoteCommand('SEEK_TO', Math.round(value))}
+              disabled={!nowPlaying}
+              onValueChange={(value) => setScrubPosition(value)}
+              onSlidingComplete={handleSeekComplete}
             />
 
             <View style={styles.timeRow}>
-              <Text style={styles.timeLabel}>{formatTime(playbackPosition)}</Text>
-              <Text style={styles.timeLabel}>{formatTime(PLAYER_DURATION)}</Text>
+              <Text style={styles.timeLabel}>{formatTime(displayedPosition)}</Text>
+              <Text style={styles.timeLabel}>{formatTime(duration)}</Text>
             </View>
 
             <Pressable
               style={styles.playerPauseButton}
-              onPress={() => emitRemoteCommand('PAUSE')}
+              onPress={handlePauseOrPlay}
+              accessibilityRole="button"
+              accessibilityLabel={isPlaying ? 'Pause playback' : 'Resume playback'}
             >
-              <Pause color={COLORS.accent} size={28} strokeWidth={2.7} />
+              {isPlaying ? (
+                <Pause color={COLORS.accent} size={28} strokeWidth={2.7} />
+              ) : (
+                <Play color={COLORS.accent} size={28} strokeWidth={2.7} />
+              )}
             </Pressable>
           </View>
 

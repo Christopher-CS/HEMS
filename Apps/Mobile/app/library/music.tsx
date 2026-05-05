@@ -10,9 +10,13 @@ import {
 import { Search } from 'lucide-react-native';
 import CategoryHeader from '../../components/library/category-header';
 import MediaCard from '../../components/library/media-card';
+import StatusBanner from '../../components/StatusBanner';
 import COLORS from '../../constants/Colors';
-import { MUSIC_TRACKS, formatDuration } from '../../data/media-library';
-import { emitLibraryCommand } from '../../utils/library-command-adapter';
+import { formatDuration } from '../../data/media-library';
+import { useDevices } from '../../hooks/useDevices';
+import { useLibrary } from '../../hooks/useLibrary';
+import { useTransport } from '../../hooks/useTransport';
+import { buildLibraryCommand } from '../../utils/library-command-adapter';
 import type { MusicTrack } from '../../types/media';
 
 const ACCENT = COLORS.accent;
@@ -20,18 +24,21 @@ const ACCENT = COLORS.accent;
 export default function MusicPage() {
   const [query, setQuery] = useState('');
   const [activeGenre, setActiveGenre] = useState<string>('All');
+  const { music, loading, error, refresh } = useLibrary();
+  const { primaryDeviceId } = useDevices();
+  const { send } = useTransport();
 
   const genres = useMemo(() => {
     const set = new Set<string>();
-    MUSIC_TRACKS.forEach((track) => {
+    music.forEach((track) => {
       if (track.genre) set.add(track.genre);
     });
     return ['All', ...Array.from(set)];
-  }, []);
+  }, [music]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return MUSIC_TRACKS.filter((track) => {
+    return music.filter((track) => {
       const matchesGenre = activeGenre === 'All' || track.genre === activeGenre;
       if (!matchesGenre) return false;
       if (!q) return true;
@@ -41,14 +48,17 @@ export default function MusicPage() {
         track.album.toLowerCase().includes(q)
       );
     });
-  }, [query, activeGenre]);
+  }, [query, activeGenre, music]);
 
   const renderItem = ({ item }: { item: MusicTrack }) => (
     <MediaCard
       item={item}
       accentColor={ACCENT}
       metaLines={[`${item.artist} · ${item.album}`, formatDuration(item.durationSeconds)]}
-      onAction={(action) => emitLibraryCommand(action, item, item.durationSeconds)}
+      onAction={(action) => {
+        const envelope = buildLibraryCommand(action, item, primaryDeviceId, item.durationSeconds);
+        send(envelope).catch(() => {});
+      }}
     />
   );
 
@@ -56,9 +66,19 @@ export default function MusicPage() {
     <View style={styles.container}>
       <CategoryHeader
         title="Music"
-        subtitle={`${MUSIC_TRACKS.length} tracks ready to send to Sound System`}
+        subtitle={`${music.length} tracks ready to send to Sound System`}
         accentColor={ACCENT}
       />
+
+      {loading && <StatusBanner tone="loading" title="Loading music" />}
+      {error && !loading && (
+        <StatusBanner
+          tone="error"
+          title="Couldn't load music"
+          detail={error}
+          onRetry={refresh}
+        />
+      )}
 
       <View style={styles.searchRow}>
         <Search color={COLORS.muted} size={18} />

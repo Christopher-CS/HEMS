@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import {
   Pressable,
   ScrollView,
@@ -16,15 +16,13 @@ import {
   Play,
 } from 'lucide-react-native';
 import TopBar from '../../components/TopBar';
+import StatusBanner from '../../components/StatusBanner';
 import COLORS from '../../constants/Colors';
-import {
-  MOVIES,
-  MUSIC_TRACKS,
-  PODCAST_EPISODES,
-  RECENT_MEDIA,
-} from '../../data/media-library';
-import { emitLibraryCommand } from '../../utils/library-command-adapter';
-import type { MediaCategory, RecentMediaRef } from '../../types/media';
+import { useDevices } from '../../hooks/useDevices';
+import { useLibrary } from '../../hooks/useLibrary';
+import { useTransport } from '../../hooks/useTransport';
+import { buildLibraryCommand } from '../../utils/library-command-adapter';
+import type { LibraryActionType, MediaCategory, MediaItem, RecentMediaRef } from '../../types/media';
 
 type CategoryDef = {
   id: MediaCategory;
@@ -37,41 +35,52 @@ type CategoryDef = {
   route: '/library/music' | '/library/movies' | '/library/podcasts';
 };
 
-const CATEGORIES: CategoryDef[] = [
-  {
-    id: 'music',
-    title: 'Music',
-    description: 'Albums, tracks, and playlists',
-    count: MUSIC_TRACKS.length,
-    icon: <Music color={COLORS.text} size={24} />,
-    accent: COLORS.accent,
-    tint: COLORS.blueSoft,
-    route: '/library/music',
-  },
-  {
-    id: 'movies',
-    title: 'Movies',
-    description: 'Feature films ready to play',
-    count: MOVIES.length,
-    icon: <Clapperboard color={COLORS.text} size={24} />,
-    accent: COLORS.orange,
-    tint: COLORS.orangeSoft,
-    route: '/library/movies',
-  },
-  {
-    id: 'podcasts',
-    title: 'Podcasts',
-    description: 'Episodes and shows',
-    count: PODCAST_EPISODES.length,
-    icon: <Mic2 color={COLORS.text} size={24} />,
-    accent: COLORS.purple,
-    tint: COLORS.purpleSoft,
-    route: '/library/podcasts',
-  },
-];
-
 export default function LibraryHub() {
   const router = useRouter();
+  const { music, movies, podcasts, recents, loading, error, refresh } = useLibrary();
+  const { primaryDeviceId } = useDevices();
+  const { send } = useTransport();
+
+  const dispatchLibrary = useCallback(
+    (action: LibraryActionType, item: MediaItem | RecentMediaRef, durationSeconds?: number) => {
+      const envelope = buildLibraryCommand(action, item, primaryDeviceId, durationSeconds);
+      send(envelope).catch(() => {});
+    },
+    [primaryDeviceId, send]
+  );
+
+  const categories: CategoryDef[] = [
+    {
+      id: 'music',
+      title: 'Music',
+      description: 'Albums, tracks, and playlists',
+      count: music.length,
+      icon: <Music color={COLORS.text} size={24} />,
+      accent: COLORS.accent,
+      tint: COLORS.blueSoft,
+      route: '/library/music',
+    },
+    {
+      id: 'movies',
+      title: 'Movies',
+      description: 'Feature films ready to play',
+      count: movies.length,
+      icon: <Clapperboard color={COLORS.text} size={24} />,
+      accent: COLORS.orange,
+      tint: COLORS.orangeSoft,
+      route: '/library/movies',
+    },
+    {
+      id: 'podcasts',
+      title: 'Podcasts',
+      description: 'Episodes and shows',
+      count: podcasts.length,
+      icon: <Mic2 color={COLORS.text} size={24} />,
+      accent: COLORS.purple,
+      tint: COLORS.purpleSoft,
+      route: '/library/podcasts',
+    },
+  ];
 
   return (
     <View style={styles.container}>
@@ -88,12 +97,24 @@ export default function LibraryHub() {
           </Text>
         </View>
 
+        {loading && (
+          <StatusBanner tone="loading" title="Loading library" detail="Fetching from backend" />
+        )}
+        {error && !loading && (
+          <StatusBanner
+            tone="error"
+            title="Library failed to load"
+            detail={`${error}. Showing seed content.`}
+            onRetry={refresh}
+          />
+        )}
+
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Browse</Text>
         </View>
 
         <View style={styles.categoryList}>
-          {CATEGORIES.map((category) => (
+          {categories.map((category) => (
             <Pressable
               key={category.id}
               accessibilityRole="button"
@@ -126,15 +147,23 @@ export default function LibraryHub() {
           <Text style={styles.sectionHint}>Recently played</Text>
         </View>
 
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.recentsScroll}
-        >
-          {RECENT_MEDIA.map((recent) => (
-            <RecentCard key={recent.id} recent={recent} />
-          ))}
-        </ScrollView>
+        {recents.length === 0 ? (
+          <Text style={styles.emptyHint}>Nothing yet — play something to start your history.</Text>
+        ) : (
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.recentsScroll}
+          >
+            {recents.map((recent) => (
+              <RecentCard
+                key={recent.id}
+                recent={recent}
+                onPress={() => dispatchLibrary('PLAY', recent, recent.durationSeconds)}
+              />
+            ))}
+          </ScrollView>
+        )}
 
         <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Quick actions</Text>
@@ -148,8 +177,9 @@ export default function LibraryHub() {
             tint={COLORS.blueSoft}
             icon={<Music color={COLORS.accent} size={20} />}
             onPress={() => {
-              const pick = MUSIC_TRACKS[Math.floor(Math.random() * MUSIC_TRACKS.length)];
-              emitLibraryCommand('PLAY', pick, pick.durationSeconds);
+              if (music.length === 0) return;
+              const pick = music[Math.floor(Math.random() * music.length)];
+              dispatchLibrary('PLAY', pick, pick.durationSeconds);
             }}
           />
           <QuickAction
@@ -159,15 +189,9 @@ export default function LibraryHub() {
             tint={COLORS.orangeSoft}
             icon={<Clapperboard color={COLORS.orange} size={20} />}
             onPress={() => {
-              const firstMovieRecent = RECENT_MEDIA.find(
-                (media) => media.category === 'movies'
-              );
+              const firstMovieRecent = recents.find((media) => media.category === 'movies');
               if (firstMovieRecent) {
-                emitLibraryCommand(
-                  'PLAY',
-                  firstMovieRecent,
-                  firstMovieRecent.durationSeconds
-                );
+                dispatchLibrary('PLAY', firstMovieRecent, firstMovieRecent.durationSeconds);
               }
             }}
           />
@@ -178,8 +202,8 @@ export default function LibraryHub() {
             tint={COLORS.purpleSoft}
             icon={<Mic2 color={COLORS.purple} size={20} />}
             onPress={() => {
-              const latest = PODCAST_EPISODES[PODCAST_EPISODES.length - 1];
-              emitLibraryCommand('QUEUE', latest, latest.durationSeconds);
+              const latest = podcasts[podcasts.length - 1];
+              if (latest) dispatchLibrary('QUEUE', latest, latest.durationSeconds);
             }}
           />
         </View>
@@ -224,12 +248,12 @@ function QuickAction({
   );
 }
 
-function RecentCard({ recent }: { recent: RecentMediaRef }) {
+function RecentCard({ recent, onPress }: { recent: RecentMediaRef; onPress: () => void }) {
   return (
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={`Resume ${recent.title}`}
-      onPress={() => emitLibraryCommand('PLAY', recent, recent.durationSeconds)}
+      onPress={onPress}
       style={({ pressed }) => [styles.recentCard, pressed && styles.pressed]}
     >
       <View style={styles.recentArtworkWrap}>
@@ -310,6 +334,11 @@ const styles = StyleSheet.create({
     color: COLORS.muted,
     fontSize: 12,
     fontWeight: '500',
+  },
+  emptyHint: {
+    paddingHorizontal: 20,
+    color: COLORS.muted,
+    fontSize: 13,
   },
   categoryList: {
     paddingHorizontal: 20,

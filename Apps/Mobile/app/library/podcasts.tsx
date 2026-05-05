@@ -10,9 +10,13 @@ import {
 import { Search } from 'lucide-react-native';
 import CategoryHeader from '../../components/library/category-header';
 import MediaCard from '../../components/library/media-card';
+import StatusBanner from '../../components/StatusBanner';
 import COLORS from '../../constants/Colors';
-import { PODCAST_EPISODES, formatDuration } from '../../data/media-library';
-import { emitLibraryCommand } from '../../utils/library-command-adapter';
+import { formatDuration } from '../../data/media-library';
+import { useDevices } from '../../hooks/useDevices';
+import { useLibrary } from '../../hooks/useLibrary';
+import { useTransport } from '../../hooks/useTransport';
+import { buildLibraryCommand } from '../../utils/library-command-adapter';
 import type { PodcastEpisode } from '../../types/media';
 
 const ACCENT = COLORS.purple;
@@ -20,16 +24,19 @@ const ACCENT = COLORS.purple;
 export default function PodcastsPage() {
   const [query, setQuery] = useState('');
   const [activeShow, setActiveShow] = useState<string>('All');
+  const { podcasts, loading, error, refresh } = useLibrary();
+  const { primaryDeviceId } = useDevices();
+  const { send } = useTransport();
 
   const shows = useMemo(() => {
     const set = new Set<string>();
-    PODCAST_EPISODES.forEach((episode) => set.add(episode.showName));
+    podcasts.forEach((episode) => set.add(episode.showName));
     return ['All', ...Array.from(set)];
-  }, []);
+  }, [podcasts]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return PODCAST_EPISODES.filter((episode) => {
+    return podcasts.filter((episode) => {
       const matchesShow = activeShow === 'All' || episode.showName === activeShow;
       if (!matchesShow) return false;
       if (!q) return true;
@@ -38,7 +45,7 @@ export default function PodcastsPage() {
         episode.showName.toLowerCase().includes(q)
       );
     });
-  }, [query, activeShow]);
+  }, [query, activeShow, podcasts]);
 
   const renderItem = ({ item }: { item: PodcastEpisode }) => (
     <MediaCard
@@ -50,7 +57,10 @@ export default function PodcastsPage() {
           : item.showName,
         `${formatDuration(item.durationSeconds)}${item.publishedOn ? ` · ${item.publishedOn}` : ''}`,
       ]}
-      onAction={(action) => emitLibraryCommand(action, item, item.durationSeconds)}
+      onAction={(action) => {
+        const envelope = buildLibraryCommand(action, item, primaryDeviceId, item.durationSeconds);
+        send(envelope).catch(() => {});
+      }}
     />
   );
 
@@ -58,9 +68,19 @@ export default function PodcastsPage() {
     <View style={styles.container}>
       <CategoryHeader
         title="Podcasts"
-        subtitle={`${PODCAST_EPISODES.length} episodes ready for the room`}
+        subtitle={`${podcasts.length} episodes ready for the room`}
         accentColor={ACCENT}
       />
+
+      {loading && <StatusBanner tone="loading" title="Loading podcasts" />}
+      {error && !loading && (
+        <StatusBanner
+          tone="error"
+          title="Couldn't load podcasts"
+          detail={error}
+          onRetry={refresh}
+        />
+      )}
 
       <View style={styles.searchRow}>
         <Search color={COLORS.muted} size={18} />

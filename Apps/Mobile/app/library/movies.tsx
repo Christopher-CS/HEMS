@@ -10,9 +10,13 @@ import {
 import { Search } from 'lucide-react-native';
 import CategoryHeader from '../../components/library/category-header';
 import MediaCard from '../../components/library/media-card';
+import StatusBanner from '../../components/StatusBanner';
 import COLORS from '../../constants/Colors';
-import { MOVIES, formatDuration } from '../../data/media-library';
-import { emitLibraryCommand } from '../../utils/library-command-adapter';
+import { formatDuration } from '../../data/media-library';
+import { useDevices } from '../../hooks/useDevices';
+import { useLibrary } from '../../hooks/useLibrary';
+import { useTransport } from '../../hooks/useTransport';
+import { buildLibraryCommand } from '../../utils/library-command-adapter';
 import type { Movie } from '../../types/media';
 
 const ACCENT = COLORS.orange;
@@ -20,18 +24,21 @@ const ACCENT = COLORS.orange;
 export default function MoviesPage() {
   const [query, setQuery] = useState('');
   const [activeGenre, setActiveGenre] = useState<string>('All');
+  const { movies, loading, error, refresh } = useLibrary();
+  const { primaryDeviceId } = useDevices();
+  const { send } = useTransport();
 
   const genres = useMemo(() => {
     const set = new Set<string>();
-    MOVIES.forEach((movie) => {
+    movies.forEach((movie) => {
       if (movie.genre) set.add(movie.genre);
     });
     return ['All', ...Array.from(set)];
-  }, []);
+  }, [movies]);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    return MOVIES.filter((movie) => {
+    return movies.filter((movie) => {
       const matchesGenre = activeGenre === 'All' || movie.genre === activeGenre;
       if (!matchesGenre) return false;
       if (!q) return true;
@@ -41,7 +48,7 @@ export default function MoviesPage() {
         String(movie.year).includes(q)
       );
     });
-  }, [query, activeGenre]);
+  }, [query, activeGenre, movies]);
 
   const renderItem = ({ item }: { item: Movie }) => (
     <MediaCard
@@ -51,7 +58,10 @@ export default function MoviesPage() {
         `${item.year} · ${item.director}`,
         `${formatDuration(item.durationSeconds)}${item.rating ? ` · ${item.rating}` : ''}`,
       ]}
-      onAction={(action) => emitLibraryCommand(action, item, item.durationSeconds)}
+      onAction={(action) => {
+        const envelope = buildLibraryCommand(action, item, primaryDeviceId, item.durationSeconds);
+        send(envelope).catch(() => {});
+      }}
     />
   );
 
@@ -59,9 +69,19 @@ export default function MoviesPage() {
     <View style={styles.container}>
       <CategoryHeader
         title="Movies"
-        subtitle={`${MOVIES.length} films available for the projector`}
+        subtitle={`${movies.length} films available for the projector`}
         accentColor={ACCENT}
       />
+
+      {loading && <StatusBanner tone="loading" title="Loading movies" />}
+      {error && !loading && (
+        <StatusBanner
+          tone="error"
+          title="Couldn't load movies"
+          detail={error}
+          onRetry={refresh}
+        />
+      )}
 
       <View style={styles.searchRow}>
         <Search color={COLORS.muted} size={18} />
