@@ -11,8 +11,9 @@ const appItemSchema = {
 };
 
 const deviceSchema = new mongoose.Schema({
-    name:  { type: String, required: true },
-    owner: { type: mongoose.Schema.Types.ObjectId, required: true, ref: 'User' },
+    name:     { type: String, required: true },
+    slug:     { type: String },
+    subtitle: { type: String },
 
     type: {
         type: String,
@@ -33,6 +34,7 @@ const deviceSchema = new mongoose.Schema({
         consoleControllable:  { type: Boolean, default: false },
         playbackControllable: { type: Boolean, default: false },
         navigatable:          { type: Boolean, default: false },
+        colorControllable:    { type: Boolean, default: false },
     },
 
     // IPowerable
@@ -86,6 +88,14 @@ const deviceSchema = new mongoose.Schema({
     // INavigatable
     navigationState: {
         cursorVisible: { type: Boolean, default: false },
+    },
+
+    // IColorControllable
+    colorState: {
+        mode:       { type: String, enum: ['white', 'color'], default: 'white' },
+        kelvin:     { type: Number, default: 4000 },
+        hue:        { type: Number, default: 0 },
+        saturation: { type: Number, default: 0 },
     },
 
 }, { timestamps: true, minimize: false });

@@ -9,7 +9,6 @@ const sceneActionSchema = new mongoose.Schema({
 
 const sceneSchema = new mongoose.Schema({
     name:      { type: String, required: true },
-    owner:     { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     actions:   [sceneActionSchema],
     isActive:  { type: Boolean, default: false },
 }, { timestamps: true });

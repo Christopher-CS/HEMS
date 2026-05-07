@@ -1,5 +1,7 @@
+import mongoose from 'mongoose';
 import Command from '../models/Command.js'
 import Device from '../models/Device.js'
+import { broadcast } from '../ws.js'
 
 export const capabilityMap = {
     // existing
@@ -13,9 +15,13 @@ export const capabilityMap = {
     move:         "moveable",
     launchApp:    "consoleControllable",
     // new
-    playback:     "playbackControllable",
-    toggleMute:   "playbackControllable",
-    navigate:     "navigatable",
+    playback:           "playbackControllable",
+    toggleMute:         "playbackControllable",
+    navigate:           "navigatable",
+    setColorMode:       "colorControllable",
+    setColorTemperature:"colorControllable",
+    setHue:             "colorControllable",
+    setSaturation:      "colorControllable",
 };
 
 export const payloadValidators = {
@@ -62,8 +68,27 @@ export const payloadValidators = {
     navigate: (payload) => {
         const valid = ["up", "down", "left", "right", "select", "back", "home", "menu"];
         if (!valid.includes(payload?.direction))
-        throw new Error(`Invalid direction. Valid: ${valid.join(", ")}`);
-  },
+            throw new Error(`Invalid direction. Valid: ${valid.join(", ")}`);
+    },
+    setColorMode: (payload) => {
+        if (!['white', 'color'].includes(payload?.mode))
+            throw new Error("Invalid color mode. Must be 'white' or 'color'");
+    },
+    setColorTemperature: (payload) => {
+        const k = payload?.kelvin;
+        if (k == null) throw new Error("Missing kelvin value");
+        if (k < 2700 || k > 6500) throw new Error("Kelvin must be between 2700 and 6500");
+    },
+    setHue: (payload) => {
+        const h = payload?.hue;
+        if (h == null) throw new Error("Missing hue value");
+        if (h < 0 || h > 359) throw new Error("Hue must be between 0 and 359");
+    },
+    setSaturation: (payload) => {
+        const s = payload?.saturation;
+        if (s == null) throw new Error("Missing saturation value");
+        if (s < 0 || s > 100) throw new Error("Saturation must be between 0 and 100");
+    },
 };
 
 export const applyPayload = {
@@ -101,10 +126,11 @@ export const applyPayload = {
     toggleMute: (_, device) => {
         device.playbackState.isMuted = !device.playbackState.isMuted;
     },
-    navigate: () => {
-        // navigation is stateless — the command is the signal,
-        // nothing to persist on the device doc
-    },
+    navigate: () => {},
+    setColorMode:        (payload, device) => { device.colorState.mode = payload.mode; },
+    setColorTemperature: (payload, device) => { device.colorState.kelvin = payload.kelvin; },
+    setHue:              (payload, device) => { device.colorState.hue = payload.hue; },
+    setSaturation:       (payload, device) => { device.colorState.saturation = payload.saturation; },
 };
 
 
@@ -118,8 +144,10 @@ export const executeCommand = async (req, res) => {
         if (!capabilityMap[type])
             throw new Error("Unknown command type");
 
-        // Fetch device
-        const deviceDoc = await Device.findById(device);
+        // Fetch device by _id or slug
+        const deviceDoc = mongoose.isValidObjectId(device)
+            ? (await Device.findById(device)) ?? (await Device.findOne({ slug: device }))
+            : await Device.findOne({ slug: device });
         if (!deviceDoc) throw new Error("Device not found");
 
         // Validate payload
@@ -133,8 +161,23 @@ export const executeCommand = async (req, res) => {
 
         status = "executed";
 
+        broadcast({
+            event: 'device:state',
+            slug: deviceDoc.slug,
+            powerState: deviceDoc.powerState,
+            levelCurrent: deviceDoc.level?.current ?? 0,
+            colorMode: deviceDoc.colorState?.mode ?? 'white',
+            colorHue: deviceDoc.colorState?.hue ?? 0,
+            colorSaturation: deviceDoc.colorState?.saturation ?? 0,
+            colorKelvin: deviceDoc.colorState?.kelvin ?? 4000,
+            modeCurrent: deviceDoc.mode?.current ?? '',
+            playbackStatus: deviceDoc.playbackState?.status ?? 'stopped',
+            playbackMuted: deviceDoc.playbackState?.isMuted ?? false,
+            consoleApp: deviceDoc.consoleState?.currentApp ?? '',
+        });
+
         const command = await Command.create({
-            device,
+            device: deviceDoc._id,
             issuedBy,
             type,
             payload,
@@ -154,7 +197,9 @@ export const executeCommand = async (req, res) => {
 
         try {
             await Command.create({
-                device,
+                device: typeof device === 'string' && mongoose.isValidObjectId(device)
+                    ? device
+                    : undefined,
                 issuedBy,
                 type,
                 payload,

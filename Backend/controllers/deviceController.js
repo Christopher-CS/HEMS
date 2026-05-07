@@ -2,7 +2,6 @@ import Device from '../models/Device.js'
 
 const validateData = (data) => {
     if (!data.name) throw new Error("Missing device name");
-    if (!data.owner) throw new Error("Missing owner");
     if (!data.capabilities) throw new Error("Missing capabilities");
 
     if (data.capabilities.powerable && data.powerState === undefined)
@@ -44,7 +43,7 @@ export const addDevice = async (req, res) => {
 // GET /devices
 export const getDevices = async (req, res) => {
     try {
-        const devices = await Device.find({ owner: req.user._id }).sort({ createdAt: -1 });
+        const devices = await Device.find({}).sort({ createdAt: -1 });
         return res.json({ success: true, devices });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
@@ -58,10 +57,7 @@ export const getDevice = async (req, res) => {
 
         if (!device)
             return res.status(404).json({ success: false, message: "Device not found" });
-        
-        if (device.owner.toString() !== req.user._id.toString())
-            return res.status(403).json({ success: false, message: "Not authorized" });
-        
+
         return res.json({ success: true, device });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
@@ -78,9 +74,6 @@ export const getDeviceState = async (req, res) => {
         if (!device)
             return res.status(404).json({ success: false, message: "Device not found" });
 
-        if (device.owner.toString() !== req.user._id.toString())
-            return res.status(403).json({ success: false, message: "Not authorized" });
-
         return res.json({ success: true, state: device });
     } catch (err) {
         return res.status(500).json({ success: false, message: err.message });
@@ -93,10 +86,8 @@ export const updateDevice = async (req, res) => {
         const device = await Device.findById(req.params.id);
         if (!device)
             return res.status(404).json({ success: false, message: "Device not found" });
-        if (device.owner.toString() !== req.user._id.toString())
-            return res.status(403).json({ success: false, message: "Not authorized" });
 
-        const allowed = ["name", "capabilities", "level", "mode", "position", "consoleState"];
+        const allowed = ["name", "capabilities", "level", "mode", "position", "consoleState", "colorState"];
         allowed.forEach((key) => {
             if (req.body[key] !== undefined) device[key] = req.body[key];
         });
@@ -131,8 +122,6 @@ export const deleteDevice = async (req, res) => {
         const device = await Device.findById(req.params.id);
         if (!device)
             return res.status(404).json({ success: false, message: "Device not found" });
-        if (device.owner.toString() !== req.user._id.toString())
-            return res.status(403).json({ success: false, message: "Not authorized" });
 
         await device.deleteOne();
         return res.json({ success: true, message: "Device deleted" });

@@ -28,12 +28,16 @@ public class SpeakerController : MonoBehaviour
         }
     }
 
+    public void SetMute(bool mute)
+    {
+        foreach (AudioSource speaker in speakers)
+            speaker.mute = mute;
+    }
+
     public void ToggleMute()
     {
         foreach (AudioSource speaker in speakers)
-        {
             speaker.mute = !speaker.mute;
-        }
     }
 
 

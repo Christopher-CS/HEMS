@@ -4,85 +4,91 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Lightbulb, Power, Speaker, Tv, X } from 'lucide-react-native';
+import {
+  AlignJustify,
+  Camera,
+  Lightbulb,
+  Monitor,
+  Snowflake,
+  Speaker,
+  Thermometer,
+  Tv,
+  Wind,
+  X,
+} from 'lucide-react-native';
 import COLORS from '../../constants/Colors';
-import type { DeviceKind, DeviceSnapshot } from '../../state/devices/store';
+
+export type BackendDeviceType =
+  | 'tv' | 'light' | 'speaker' | 'fan' | 'thermostat'
+  | 'blind' | 'projector' | 'camera' | 'aircon';
+
+export type Capabilities = {
+  powerable: boolean;
+  levelAdjustable: boolean;
+  modeSelectable: boolean;
+  moveable: boolean;
+  consoleControllable: boolean;
+  playbackControllable: boolean;
+  navigatable: boolean;
+  colorControllable: boolean;
+};
+
+export type NewDeviceInput = {
+  name: string;
+  subtitle: string;
+  type: BackendDeviceType;
+  capabilities: Capabilities;
+};
 
 type Props = {
   visible: boolean;
   onClose: () => void;
-  onConnect: (device: DeviceSnapshot) => void;
+  onConnect: (input: NewDeviceInput) => void;
 };
 
-const KIND_OPTIONS: Array<{ id: DeviceKind; label: string; icon: React.ReactNode; defaultSubtitle: string }> = [
-  { id: 'tv', label: 'TV', icon: <Tv color={COLORS.tv} size={20} />, defaultSubtitle: 'HDMI display' },
-  { id: 'light', label: 'Light', icon: <Lightbulb color={COLORS.light} size={20} />, defaultSubtitle: 'Smart bulb' },
-  { id: 'speaker', label: 'Speaker', icon: <Speaker color={COLORS.speaker} size={20} />, defaultSubtitle: 'Audio output' },
-  { id: 'generic', label: 'Other', icon: <Power color={COLORS.accent} size={20} />, defaultSubtitle: 'Smart device' },
+const DEFAULT_CAPS: Record<BackendDeviceType, Capabilities> = {
+  tv:        { powerable: true,  levelAdjustable: true,  modeSelectable: true,  moveable: false, consoleControllable: false, playbackControllable: true,  navigatable: true,  colorControllable: false },
+  light:     { powerable: true,  levelAdjustable: true,  modeSelectable: false, moveable: false, consoleControllable: false, playbackControllable: false, navigatable: false, colorControllable: true  },
+  speaker:   { powerable: true,  levelAdjustable: true,  modeSelectable: false, moveable: false, consoleControllable: false, playbackControllable: true,  navigatable: false, colorControllable: false },
+  fan:       { powerable: true,  levelAdjustable: true,  modeSelectable: false, moveable: false, consoleControllable: false, playbackControllable: false, navigatable: false, colorControllable: false },
+  thermostat:{ powerable: true,  levelAdjustable: false, modeSelectable: true,  moveable: false, consoleControllable: false, playbackControllable: false, navigatable: false, colorControllable: false },
+  blind:     { powerable: true,  levelAdjustable: true,  modeSelectable: false, moveable: true,  consoleControllable: false, playbackControllable: false, navigatable: false, colorControllable: false },
+  projector: { powerable: true,  levelAdjustable: true,  modeSelectable: true,  moveable: false, consoleControllable: false, playbackControllable: true,  navigatable: false, colorControllable: false },
+  camera:    { powerable: true,  levelAdjustable: false, modeSelectable: false, moveable: false, consoleControllable: false, playbackControllable: false, navigatable: false, colorControllable: false },
+  aircon:    { powerable: true,  levelAdjustable: true,  modeSelectable: true,  moveable: false, consoleControllable: false, playbackControllable: false, navigatable: false, colorControllable: false },
+};
+
+type TypeOption = { id: BackendDeviceType; label: string; icon: (color: string) => React.ReactNode };
+
+const TYPE_OPTIONS: TypeOption[] = [
+  { id: 'tv',        label: 'TV',        icon: (c) => <Tv color={c} size={18} /> },
+  { id: 'light',     label: 'Light',     icon: (c) => <Lightbulb color={c} size={18} /> },
+  { id: 'speaker',   label: 'Speaker',   icon: (c) => <Speaker color={c} size={18} /> },
+  { id: 'fan',       label: 'Fan',       icon: (c) => <Wind color={c} size={18} /> },
+  { id: 'thermostat',label: 'Thermostat',icon: (c) => <Thermometer color={c} size={18} /> },
+  { id: 'blind',     label: 'Blind',     icon: (c) => <AlignJustify color={c} size={18} /> },
+  { id: 'projector', label: 'Projector', icon: (c) => <Monitor color={c} size={18} /> },
+  { id: 'camera',    label: 'Camera',    icon: (c) => <Camera color={c} size={18} /> },
+  { id: 'aircon',    label: 'A/C',       icon: (c) => <Snowflake color={c} size={18} /> },
 ];
-
-const slug = (value: string) =>
-  value
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .slice(0, 32);
-
-function buildDevice(name: string, subtitle: string, kind: DeviceKind): DeviceSnapshot {
-  const trimmedName = name.trim() || 'New Device';
-  const baseId = slug(trimmedName) || `device-${Date.now().toString(36)}`;
-  const id = `${kind}-${baseId}-${Date.now().toString(36).slice(-4)}`;
-  const base: DeviceSnapshot = {
-    id,
-    name: trimmedName,
-    subtitle: subtitle.trim() || KIND_OPTIONS.find((opt) => opt.id === kind)?.defaultSubtitle || 'Smart device',
-    kind,
-    enabled: false,
-    level: 50,
-    userAdded: true,
-  };
-  switch (kind) {
-    case 'tv':
-      return {
-        ...base,
-        inputSource: 'HDMI 1',
-        availableSources: ['HDMI 1', 'HDMI 2', 'HDMI 3', 'Streaming'],
-      };
-    case 'light':
-      return {
-        ...base,
-        colorMode: 'white',
-        colorTemperatureK: 4000,
-        hue: 30,
-        saturation: 80,
-      };
-    case 'speaker':
-      return {
-        ...base,
-        inputSource: 'Bluetooth',
-        availableSources: ['Bluetooth', 'AUX', 'Optical', 'HDMI ARC'],
-      };
-    default:
-      return base;
-  }
-}
 
 export default function AddDeviceModal({ visible, onClose, onConnect }: Props) {
   const insets = useSafeAreaInsets();
   const [name, setName] = useState('');
   const [subtitle, setSubtitle] = useState('');
-  const [kind, setKind] = useState<DeviceKind>('light');
+  const [type, setType] = useState<BackendDeviceType>('light');
 
   const reset = () => {
     setName('');
     setSubtitle('');
-    setKind('light');
+    setType('light');
   };
 
   const handleClose = () => {
@@ -92,7 +98,7 @@ export default function AddDeviceModal({ visible, onClose, onConnect }: Props) {
 
   const handleConnect = () => {
     if (!name.trim()) return;
-    onConnect(buildDevice(name, subtitle, kind));
+    onConnect({ name: name.trim(), subtitle: subtitle.trim(), type, capabilities: DEFAULT_CAPS[type] });
     handleClose();
   };
 
@@ -131,52 +137,60 @@ export default function AddDeviceModal({ visible, onClose, onConnect }: Props) {
             </Pressable>
           </View>
 
-          <Text style={styles.label}>Name</Text>
-          <TextInput
-            value={name}
-            onChangeText={setName}
-            placeholder="Office Lamp"
-            placeholderTextColor={COLORS.muted}
-            style={styles.input}
-            autoCapitalize="words"
-            autoCorrect={false}
-            returnKeyType="next"
-          />
+          <ScrollView
+            showsVerticalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            contentContainerStyle={styles.scrollContent}
+          >
+            <Text style={styles.label}>Name</Text>
+            <TextInput
+              value={name}
+              onChangeText={setName}
+              placeholder="Office Lamp"
+              placeholderTextColor={COLORS.muted}
+              style={styles.input}
+              autoCapitalize="words"
+              autoCorrect={false}
+              returnKeyType="next"
+            />
 
-          <Text style={styles.label}>Model / Subtitle (optional)</Text>
-          <TextInput
-            value={subtitle}
-            onChangeText={setSubtitle}
-            placeholder="LIFX Mini"
-            placeholderTextColor={COLORS.muted}
-            style={styles.input}
-            autoCapitalize="words"
-            autoCorrect={false}
-            returnKeyType="done"
-          />
+            <Text style={styles.label}>Model / Subtitle (optional)</Text>
+            <TextInput
+              value={subtitle}
+              onChangeText={setSubtitle}
+              placeholder="LIFX Mini"
+              placeholderTextColor={COLORS.muted}
+              style={styles.input}
+              autoCapitalize="words"
+              autoCorrect={false}
+              returnKeyType="done"
+            />
 
-          <Text style={styles.label}>Type</Text>
-          <View style={styles.kindGrid}>
-            {KIND_OPTIONS.map((opt) => {
-              const active = kind === opt.id;
-              return (
-                <Pressable
-                  key={opt.id}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: active }}
-                  onPress={() => setKind(opt.id)}
-                  style={({ pressed }) => [
-                    styles.kindOption,
-                    active && styles.kindOptionActive,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  {opt.icon}
-                  <Text style={[styles.kindLabel, active && styles.kindLabelActive]}>{opt.label}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
+            <Text style={styles.label}>Type</Text>
+            <View style={styles.typeGrid}>
+              {TYPE_OPTIONS.map((opt) => {
+                const active = type === opt.id;
+                const iconColor = active ? COLORS.accent : COLORS.muted;
+                return (
+                  <Pressable
+                    key={opt.id}
+                    accessibilityRole="button"
+                    accessibilityState={{ selected: active }}
+                    onPress={() => setType(opt.id)}
+                    style={({ pressed }) => [
+                      styles.typeOption,
+                      active && styles.typeOptionActive,
+                      pressed && styles.pressed,
+                    ]}
+                  >
+                    {opt.icon(iconColor)}
+                    <Text style={[styles.typeLabel, active && styles.typeLabelActive]}>{opt.label}</Text>
+                  </Pressable>
+                );
+              })}
+            </View>
+
+          </ScrollView>
 
           <View style={styles.actionsRow}>
             <Pressable
@@ -219,9 +233,12 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: COLORS.surface,
     borderRadius: 20,
-    padding: 20,
+    paddingTop: 20,
+    paddingHorizontal: 20,
+    paddingBottom: 0,
     width: '100%',
     maxWidth: 420,
+    maxHeight: '88%',
     borderWidth: 1,
     borderColor: COLORS.surfaceAlt,
   },
@@ -229,7 +246,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 16,
+    marginBottom: 4,
   },
   title: {
     color: COLORS.text,
@@ -244,12 +261,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
+  scrollContent: {
+    paddingBottom: 8,
+  },
   label: {
     color: COLORS.muted,
     fontSize: 11,
     fontWeight: '700',
     letterSpacing: 0.8,
-    marginTop: 12,
+    marginTop: 16,
     marginBottom: 6,
   },
   input: {
@@ -262,38 +282,42 @@ const styles = StyleSheet.create({
     borderColor: COLORS.surfaceAlt,
     fontSize: 15,
   },
-  kindGrid: {
+  typeGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 10,
-  },
-  kindOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: 8,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
+  },
+  typeOption: {
+    width: '30%',
+    flexGrow: 1,
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 12,
     borderRadius: 12,
     backgroundColor: COLORS.background,
     borderWidth: 1,
     borderColor: COLORS.surfaceAlt,
   },
-  kindOptionActive: {
+  typeOptionActive: {
     backgroundColor: 'rgba(76, 101, 228, 0.15)',
     borderColor: COLORS.accent,
   },
-  kindLabel: {
+  typeLabel: {
     color: COLORS.muted,
-    fontSize: 14,
+    fontSize: 12,
     fontWeight: '600',
+    textAlign: 'center',
   },
-  kindLabelActive: {
+  typeLabelActive: {
     color: COLORS.text,
   },
   actionsRow: {
     flexDirection: 'row',
     gap: 12,
-    marginTop: 20,
+    paddingTop: 16,
+    paddingBottom: 20,
   },
   primaryButton: {
     flex: 1,

@@ -43,6 +43,8 @@ export type HouseholdAccount = {
 
 export type ScenePreset = Partial<Record<DeviceId, Partial<DeviceSnapshot>>>;
 
+export type SceneAction = { deviceId: DeviceId; command: string; value?: number };
+
 export type SceneDefinition = {
   id: string;
   label: string;
@@ -50,6 +52,7 @@ export type SceneDefinition = {
   backgroundUrl: string;
   overlayDark?: boolean;
   presets: ScenePreset;
+  actions?: SceneAction[];
 };
 
 export const PROFILE_SCENES: Record<ProfileId, SceneDefinition[]> = {
@@ -62,8 +65,8 @@ export const PROFILE_SCENES: Record<ProfileId, SceneDefinition[]> = {
         'https://images.unsplash.com/photo-1595769816263-9b910be24d5f?q=80&w=400&auto=format&fit=crop',
       presets: {
         'living-room-tv': { enabled: true, level: 65 },
-        ambiance: { enabled: true, level: 12 },
-        'sound-system': { enabled: true, level: 55 },
+        ambiance: { enabled: true, level: 12, colorMode: 'white', colorTemperatureK: 2700 },
+        'sound-system': { enabled: false, level: 0 },
       },
     },
     {
@@ -74,10 +77,11 @@ export const PROFILE_SCENES: Record<ProfileId, SceneDefinition[]> = {
         'https://images.unsplash.com/photo-1492684223066-81342ee5ff30?q=80&w=400&auto=format&fit=crop',
       overlayDark: true,
       presets: {
-        'living-room-tv': { enabled: false, level: 0 },
-        ambiance: { enabled: true, level: 80 },
+        'living-room-tv': { enabled: false },
+        ambiance: { enabled: true, level: 80, colorMode: 'color', hue: 275, saturation: 95 },
         'sound-system': { enabled: true, level: 85 },
       },
+      actions: [{ deviceId: 'sound-system', command: 'PLAY' }],
     },
   ],
   'guest-alex': [

@@ -1,6 +1,6 @@
 import Constants from 'expo-constants';
 
-export type TransportMode = 'mock' | 'socket';
+export type TransportMode = 'mock' | 'socket' | 'http';
 export type DataSource = 'mock' | 'http';
 
 export type RuntimeConfig = {
@@ -11,14 +11,14 @@ export type RuntimeConfig = {
 };
 
 const FALLBACK: RuntimeConfig = {
-  backendUrl: 'http://10.0.0.1:4000',
-  transportMode: 'mock',
+  backendUrl: 'http://localhost:4000',
+  transportMode: 'http',
   librarySource: 'mock',
-  devicesSource: 'mock',
+  devicesSource: 'http',
 };
 
 const asTransportMode = (value: unknown): TransportMode | null => {
-  if (value === 'socket' || value === 'mock') return value;
+  if (value === 'socket' || value === 'mock' || value === 'http') return value;
   return null;
 };
 

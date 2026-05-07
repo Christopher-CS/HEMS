@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Dimensions,
   Modal,
@@ -13,10 +13,15 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Slider from '@react-native-community/slider';
 import {
   Lightbulb,
+  Pause,
+  Play,
   Power,
   Speaker,
+  Square,
   Trash2,
   Tv,
+  Volume2,
+  VolumeX,
   X,
 } from 'lucide-react-native';
 import COLORS from '../../constants/Colors';
@@ -37,6 +42,8 @@ type Props = {
   onColorChange: (deviceId: string, hue: number, saturation: number) => void;
   onColorCommit: (deviceId: string, hue: number, saturation: number) => void;
   onSourceChange: (deviceId: string, source: string) => void;
+  onPlayback?: (deviceId: string, action: 'play' | 'pause' | 'stop') => void;
+  onMuteToggle?: (deviceId: string) => void;
   onRemove?: (deviceId: string) => void;
 };
 
@@ -75,6 +82,20 @@ export default function DeviceDetailModal(props: Props) {
     }
     return kelvinToHex(device.colorTemperatureK ?? 4000);
   }, [device]);
+
+  const [playbackStatus, setPlaybackStatus] = useState<'playing' | 'paused' | 'stopped'>('stopped');
+  const [isMuted, setIsMuted] = useState(false);
+
+  useEffect(() => {
+    setPlaybackStatus('stopped');
+    setIsMuted(false);
+  }, [device?.id]);
+
+  useEffect(() => {
+    if (!device?.enabled) {
+      setPlaybackStatus('stopped');
+    }
+  }, [device?.enabled]);
 
   const handleClose = useCallback(() => {
     onClose();
@@ -269,6 +290,58 @@ export default function DeviceDetailModal(props: Props) {
                     );
                   })}
                 </ScrollView>
+              </View>
+            )}
+
+            {device.kind === 'speaker' && (
+              <View style={[styles.section, !device.enabled && { opacity: 0.4 }]}>
+                <Text style={styles.sectionTitle}>Playback</Text>
+
+                <View style={styles.playbackRow}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Stop"
+                    disabled={!device.enabled}
+                    onPress={() => {
+                      setPlaybackStatus('stopped');
+                      props.onPlayback?.(device.id, 'stop');
+                    }}
+                    style={({ pressed }) => [styles.playbackBtn, pressed && styles.pressed]}
+                  >
+                    <Square color={playbackStatus === 'stopped' ? COLORS.speaker : COLORS.muted} size={22} />
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={playbackStatus === 'playing' ? 'Pause' : 'Play'}
+                    disabled={!device.enabled}
+                    onPress={() => {
+                      const next = playbackStatus === 'playing' ? 'paused' : 'playing';
+                      setPlaybackStatus(next);
+                      props.onPlayback?.(device.id, next === 'playing' ? 'play' : 'pause');
+                    }}
+                    style={({ pressed }) => [styles.playbackBtnPrimary, pressed && styles.pressed]}
+                  >
+                    {playbackStatus === 'playing'
+                      ? <Pause color={COLORS.text} size={26} />
+                      : <Play color={COLORS.text} size={26} />}
+                  </Pressable>
+
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={isMuted ? 'Unmute' : 'Mute'}
+                    disabled={!device.enabled}
+                    onPress={() => {
+                      setIsMuted((m) => !m);
+                      props.onMuteToggle?.(device.id);
+                    }}
+                    style={({ pressed }) => [styles.playbackBtn, pressed && styles.pressed]}
+                  >
+                    {isMuted
+                      ? <VolumeX color={COLORS.danger} size={22} />
+                      : <Volume2 color={COLORS.muted} size={22} />}
+                  </Pressable>
+                </View>
               </View>
             )}
 
@@ -481,6 +554,31 @@ const styles = StyleSheet.create({
   },
   sourceChipLabelActive: {
     color: COLORS.text,
+  },
+  playbackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 24,
+    marginTop: 12,
+  },
+  playbackBtn: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: COLORS.background,
+    borderWidth: 1,
+    borderColor: COLORS.surfaceAlt,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playbackBtnPrimary: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: COLORS.speaker,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   removeRow: {
     marginTop: 24,

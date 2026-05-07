@@ -7,11 +7,13 @@ import { RepositoriesProvider, useRepositories } from './repositories/Repositori
 import { RemoteDataProvider } from './remote-data/RemoteDataProvider';
 import { createMockTransport, setTransport } from '../services/transport';
 import { createSocketTransport } from '../services/transport/socket-transport';
+import { createHttpTransport } from '../services/transport/http-transport';
 import type {
   CommandLogEntry,
   ConsoleCommandEnvelope,
   ConsoleTransport,
 } from '../services/transport/types';
+
 
 type StateRefs = {
   appendLog: (entry: CommandLogEntry) => void;
@@ -116,30 +118,32 @@ function TransportBridge({ children }: { children: React.ReactNode }) {
   // user hasn't forced mock mode in Settings. This makes Live mode safe to ship
   // dark and lets the debug screen flip back to Mock without restarting.
   const useSocket = debug.state.mode === 'live' && config.transportMode === 'socket';
+  const useHttp = config.transportMode === 'http';
 
   useEffect(() => {
     let socketCleanup: (() => void) | null = null;
 
+    const onCommand = (entry: CommandLogEntry) => {
+      if (entry.result.ok) applyEnvelopeSideEffects(entry.envelope, refs.current);
+      refs.current.appendLog(entry);
+    };
+
     if (useSocket) {
       const transport = createSocketTransport({
         url: config.backendUrl,
-        onCommand: (entry) => {
-          if (entry.result.ok) applyEnvelopeSideEffects(entry.envelope, refs.current);
-          refs.current.appendLog(entry);
-        },
+        onCommand,
       });
       setTransport(transport);
       socketCleanup = () => transport.disconnect();
+    } else if (useHttp) {
+      setTransport(createHttpTransport({ baseUrl: config.backendUrl, onCommand }));
     } else {
       const transport: ConsoleTransport = createMockTransport({
         getSettings: () => ({
           latencyMs: refs.current.getLatency(),
           failRate: refs.current.getFailRate(),
         }),
-        onCommand: (entry) => {
-          if (entry.result.ok) applyEnvelopeSideEffects(entry.envelope, refs.current);
-          refs.current.appendLog(entry);
-        },
+        onCommand,
       });
       setTransport(transport);
     }
@@ -147,7 +151,7 @@ function TransportBridge({ children }: { children: React.ReactNode }) {
     return () => {
       socketCleanup?.();
     };
-  }, [useSocket, config.backendUrl]);
+  }, [useSocket, useHttp, config.backendUrl]);
 
   return <>{children}</>;
 }

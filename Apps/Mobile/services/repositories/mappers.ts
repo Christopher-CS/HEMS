@@ -5,7 +5,7 @@ import type {
   RecentMediaRef,
 } from '../../types/media';
 import type { LibraryPayload } from './library-repository';
-import type { DeviceSnapshot } from '../../state/devices/store';
+import type { ColorMode, DeviceKind, DeviceSnapshot } from '../../state/devices/store';
 
 type RawMusic = {
   id: string;
@@ -59,12 +59,16 @@ export type RawLibraryPayload = {
 };
 
 export type RawDevice = {
-  id?: string;
   _id?: string;
+  id?: string;
+  slug?: string;
   name?: string;
   subtitle?: string;
-  enabled?: boolean;
-  level?: number;
+  type?: string;
+  powerState?: string;
+  level?: { current?: number };
+  mode?: { current?: string; available?: Array<{ id: string; label: string }> };
+  colorState?: { mode?: string; kelvin?: number; hue?: number; saturation?: number };
 };
 
 const toMusic = (raw: RawMusic): MusicTrack => ({
@@ -124,12 +128,32 @@ export function mapLibraryPayload(raw: RawLibraryPayload | null | undefined): Li
 }
 
 export function mapDevice(raw: RawDevice): Omit<Partial<DeviceSnapshot>, 'id'> & { id: string } {
-  const id = raw.id ?? raw._id ?? '';
+  const id = raw.slug ?? raw._id ?? raw.id ?? '';
+
+  const kind: DeviceKind =
+    raw.type === 'tv' ? 'tv' :
+    raw.type === 'light' ? 'light' :
+    raw.type === 'speaker' ? 'speaker' :
+    'generic';
+
   return {
     id,
-    name: raw.name,
-    subtitle: raw.subtitle,
-    enabled: raw.enabled,
-    level: typeof raw.level === 'number' ? Math.min(100, Math.max(0, Math.round(raw.level))) : undefined,
+    kind,
+    ...(raw.name !== undefined && { name: raw.name }),
+    ...(raw.subtitle !== undefined && { subtitle: raw.subtitle }),
+    enabled: raw.powerState === 'on',
+    ...(typeof raw.level?.current === 'number' && {
+      level: Math.min(100, Math.max(0, Math.round(raw.level.current))),
+    }),
+    ...(raw.mode?.current !== undefined && { inputSource: raw.mode.current }),
+    ...(raw.mode?.available !== undefined && {
+      availableSources: raw.mode.available.map((m) => m.id),
+    }),
+    ...(raw.colorState?.mode !== undefined && {
+      colorMode: raw.colorState.mode as ColorMode,
+    }),
+    ...(typeof raw.colorState?.kelvin === 'number' && { colorTemperatureK: raw.colorState.kelvin }),
+    ...(typeof raw.colorState?.hue === 'number' && { hue: raw.colorState.hue }),
+    ...(typeof raw.colorState?.saturation === 'number' && { saturation: raw.colorState.saturation }),
   };
 }

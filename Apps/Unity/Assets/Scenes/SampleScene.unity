@@ -2608,7 +2608,7 @@ VideoPlayer:
   m_DirectAudioVolumes:
   - 1
   m_Url: 
-  m_EnabledAudioTracks: 01
+  m_EnabledAudioTracks: 00
   m_DirectAudioMutes: 00
   m_ControlledAudioTrackCount: 1
   m_PlayOnAwake: 1
@@ -3981,6 +3981,7 @@ GameObject:
   - component: {fileID: 1857197217}
   - component: {fileID: 1857197218}
   - component: {fileID: 1857197219}
+  - component: {fileID: 1857197220}
   m_Layer: 0
   m_Name: GameObject
   m_TagString: Untagged
@@ -4071,10 +4072,28 @@ MonoBehaviour:
   - {fileID: 1102132902}
   - {fileID: 1526494096}
   - {fileID: 1227658943}
+  emissionRenderers: []
   brightness: 1
   lightsOn: 1
   currentColor: {r: 1, g: 1, b: 1, a: 1}
   maxIntensity: 1
+  maxEmissionIntensity: 2
+--- !u!114 &1857197220
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1857197213}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 10a2bc0d1b2cf49eb842470ecb87874e, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: Assembly-CSharp::HEMSBridge
+  backendUrl: http://localhost:4000
+  lightController: {fileID: 1857197219}
+  speakerController: {fileID: 1857197218}
+  systemController: {fileID: 1857197214}
 --- !u!1001 &1906328046
 PrefabInstance:
   m_ObjectHideFlags: 0

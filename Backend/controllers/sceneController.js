@@ -19,19 +19,13 @@ export const createScene = async (req, res) => {
       const deviceDoc = await Device.findById(action.device);
       if (!deviceDoc)
         return res.status(404).json({ success: false, message: `Device ${action.device} not found` });
-      if (deviceDoc.owner.toString() !== req.user._id.toString())
-        return res.status(403).json({ success: false, message: `Not authorized to use device ${deviceDoc.name}` });
       if (!deviceDoc.capabilities[capabilityMap[action.type]])
         return res.status(400).json({ success: false, message: `Device ${deviceDoc.name} does not support ${action.type}` });
 
       payloadValidators[action.type](action.payload, deviceDoc);
     }
 
-    const scene = await Scene.create({
-      name,
-      owner: req.user._id,
-      actions,
-    });
+    const scene = await Scene.create({ name, actions });
 
     return res.status(201).json({ success: true, scene });
   } catch (err) {
@@ -42,7 +36,7 @@ export const createScene = async (req, res) => {
 // GET /scenes
 export const getScenes = async (req, res) => {
   try {
-    const scenes = await Scene.find({ owner: req.user._id })
+    const scenes = await Scene.find({})
       .populate('actions.device', 'name type')
       .sort({ createdAt: -1 });
 
@@ -60,8 +54,6 @@ export const getScene = async (req, res) => {
 
     if (!scene)
       return res.status(404).json({ success: false, message: "Scene not found" });
-    if (scene.owner.toString() !== req.user._id.toString())
-      return res.status(403).json({ success: false, message: "Not authorized" });
 
     return res.json({ success: true, scene });
   } catch (err) {
@@ -75,8 +67,6 @@ export const updateScene = async (req, res) => {
     const scene = await Scene.findById(req.params.id);
     if (!scene)
       return res.status(404).json({ success: false, message: "Scene not found" });
-    if (scene.owner.toString() !== req.user._id.toString())
-      return res.status(403).json({ success: false, message: "Not authorized" });
 
     const { name, actions } = req.body;
 
@@ -88,8 +78,6 @@ export const updateScene = async (req, res) => {
         const deviceDoc = await Device.findById(action.device);
         if (!deviceDoc)
           return res.status(404).json({ success: false, message: `Device ${action.device} not found` });
-        if (deviceDoc.owner.toString() !== req.user._id.toString())
-          return res.status(403).json({ success: false, message: `Not authorized to use device ${deviceDoc.name}` });
         if (!deviceDoc.capabilities[capabilityMap[action.type]])
           return res.status(400).json({ success: false, message: `Device ${deviceDoc.name} does not support ${action.type}` });
 
@@ -113,8 +101,6 @@ export const deleteScene = async (req, res) => {
     const scene = await Scene.findById(req.params.id);
     if (!scene)
       return res.status(404).json({ success: false, message: "Scene not found" });
-    if (scene.owner.toString() !== req.user._id.toString())
-      return res.status(403).json({ success: false, message: "Not authorized" });
 
     await scene.deleteOne();
     return res.json({ success: true, message: "Scene deleted" });
@@ -131,8 +117,6 @@ export const executeScene = async (req, res) => {
     const scene = await Scene.findById(req.params.id);
     if (!scene)
       return res.status(404).json({ success: false, message: "Scene not found" });
-    if (scene.owner.toString() !== req.user._id.toString())
-      return res.status(403).json({ success: false, message: "Not authorized" });
 
     const sorted = [...scene.actions].sort((a, b) => a.order - b.order);
     const results = [];
@@ -191,8 +175,6 @@ export const deactivateScene = async (req, res) => {
     const scene = await Scene.findById(req.params.id);
     if (!scene)
       return res.status(404).json({ success: false, message: "Scene not found" });
-    if (scene.owner.toString() !== req.user._id.toString())
-      return res.status(403).json({ success: false, message: "Not authorized" });
 
     scene.isActive = false;
     await scene.save();

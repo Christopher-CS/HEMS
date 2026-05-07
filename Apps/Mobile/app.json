@@ -46,10 +46,10 @@
       "reactCompiler": true
     },
     "extra": {
-      "backendUrl": "http://10.0.0.1:4000",
-      "transportMode": "mock",
+      "backendUrl": "http://localhost:4000",
+      "transportMode": "http",
       "librarySource": "mock",
-      "devicesSource": "mock"
+      "devicesSource": "http"
     }
   }
 }

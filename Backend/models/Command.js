@@ -2,7 +2,7 @@ import mongoose from 'mongoose';
 
 const commandSchema = new mongoose.Schema({
     device: { type: mongoose.Schema.Types.ObjectId, ref: 'Device', required: true },
-    issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Profile', required: true },
+    issuedBy: { type: String },
     type: { type: String, required: true },
     payload: { type: mongoose.Schema.Types.Mixed },
     status: {

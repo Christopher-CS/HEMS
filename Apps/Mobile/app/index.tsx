@@ -23,14 +23,17 @@ import { Image } from 'expo-image';
 import Slider from '@react-native-community/slider';
 import TopBar from '../components/TopBar';
 import StatusBanner from '../components/StatusBanner';
-import AddDeviceModal from '../components/control/AddDeviceModal';
+import AddDeviceModal, { type NewDeviceInput } from '../components/control/AddDeviceModal';
+import { useRepositories } from '../state/repositories/RepositoriesProvider';
+import { mapDevice, type RawDevice } from '../services/repositories/mappers';
 import DeviceDetailModal from '../components/control/DeviceDetailModal';
 import COLORS from '../constants/Colors';
 import { useDevices } from '../hooks/useDevices';
 import { useLatestCommand } from '../hooks/useLatestCommand';
 import { useTransport } from '../hooks/useTransport';
 import type { ConsoleCommandEnvelope, ConsoleCommandToken } from '../services/transport/types';
-import type { ColorMode, DeviceId, DeviceKind, DeviceSnapshot } from '../state/devices/store';
+import { PROFILE_SCENES } from '../state/devices/store';
+import type { ColorMode, DeviceId, DeviceKind, DeviceSnapshot, ProfileId, SceneAction } from '../state/devices/store';
 
 const { width } = Dimensions.get('window');
 
@@ -101,6 +104,7 @@ export default function Home() {
   } = useDevices();
   const { send } = useTransport();
   const latest = useLatestCommand();
+  const { config } = useRepositories();
 
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailId, setDetailId] = useState<DeviceId | null>(null);
@@ -136,7 +140,7 @@ export default function Home() {
 
   const handleLevelCommit = (deviceId: DeviceId, next: number) => {
     setLevel(deviceId, next);
-    dispatchCommand(deviceId, 'SEEK_TO', Math.round(next));
+    dispatchCommand(deviceId, 'SET_LEVEL', Math.round(next));
   };
 
   const handleColorModeChange = (deviceId: DeviceId, mode: ColorMode) => {
@@ -171,12 +175,84 @@ export default function Home() {
     });
   };
 
-  const handleAddDevice = (device: DeviceSnapshot) => {
-    addDevice(device);
-    dispatchCommand(device.id, 'CONNECT_DEVICE', undefined, {
-      title: device.name,
-      subtitle: device.kind,
-    });
+  const handlePlayback = (deviceId: DeviceId, action: 'play' | 'pause' | 'stop') => {
+    const token = action === 'play' ? 'PLAY' : action === 'pause' ? 'PAUSE' : 'STOP';
+    dispatchCommand(deviceId, token);
+  };
+
+  const handleMuteToggle = (deviceId: DeviceId) => {
+    dispatchCommand(deviceId, 'TOGGLE_MUTE');
+  };
+
+  const handleApplyScene = useCallback(
+    (profileId: ProfileId, sceneId: string) => {
+      applyScene(profileId, sceneId);
+      const sceneDef = PROFILE_SCENES[profileId].find((s) => s.id === sceneId);
+      if (!sceneDef) return;
+      for (const [deviceId, partial] of Object.entries(sceneDef.presets) as Array<
+        [DeviceId, Partial<DeviceSnapshot> | undefined]
+      >) {
+        if (!partial) continue;
+        if (typeof partial.enabled === 'boolean')
+          dispatchCommand(deviceId, 'POWER_TOGGLE', partial.enabled ? 1 : 0);
+        if (typeof partial.level === 'number')
+          dispatchCommand(deviceId, 'SET_LEVEL', partial.level);
+        if (partial.colorMode)
+          dispatchCommand(deviceId, 'SET_COLOR_MODE', partial.colorMode === 'color' ? 1 : 0);
+        if (typeof partial.colorTemperatureK === 'number')
+          dispatchCommand(deviceId, 'SET_COLOR_TEMPERATURE', partial.colorTemperatureK);
+        if (typeof partial.hue === 'number')
+          dispatchCommand(deviceId, 'SET_HUE', partial.hue);
+        if (typeof partial.saturation === 'number')
+          dispatchCommand(deviceId, 'SET_SATURATION', partial.saturation);
+      }
+      if (sceneDef.actions && sceneDef.actions.length > 0) {
+        const pending = [...sceneDef.actions] as SceneAction[];
+        setTimeout(() => {
+          for (const action of pending)
+            dispatchCommand(action.deviceId, action.command as ConsoleCommandToken, action.value);
+        }, 400);
+      }
+    },
+    [applyScene, dispatchCommand]
+  );
+
+  const handleAddDevice = async (input: NewDeviceInput) => {
+    const base = input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '').slice(0, 28);
+    const body: Record<string, unknown> = {
+      name: input.name,
+      slug: `${base}-${Date.now().toString(36).slice(-4)}`,
+      type: input.type,
+      capabilities: input.capabilities,
+      ...(input.subtitle && { subtitle: input.subtitle }),
+      ...(input.capabilities.powerable && { powerState: 'off' }),
+      ...(input.capabilities.levelAdjustable && { level: { current: 0, min: 0, max: 100, step: 1, unit: '%' } }),
+      ...(input.capabilities.modeSelectable && { mode: { current: '', available: [] } }),
+      ...(input.capabilities.moveable && { position: { current: 0, min: 0, max: 100, step: 1, unit: '%' } }),
+      ...(input.capabilities.consoleControllable && { consoleState: { currentApp: '', availableApps: [] } }),
+    };
+    try {
+      const response = await fetch(`${config.backendUrl}/api/devices`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = (await response.json()) as { success?: boolean; device?: RawDevice };
+      if (response.ok && data.success && data.device) {
+        const mapped = mapDevice(data.device);
+        addDevice({
+          name: input.name,
+          subtitle: input.subtitle || input.type,
+          kind: 'generic',
+          enabled: false,
+          level: 0,
+          ...mapped,
+          userAdded: true,
+        } as DeviceSnapshot);
+      }
+    } catch (err) {
+      console.error('Failed to add device:', err);
+    }
   };
 
   const handleRemoveDevice = (deviceId: DeviceId) => {
@@ -239,7 +315,7 @@ export default function Home() {
                 )
               }
               iconStyle={styles.sceneIconWrap}
-              onPress={() => applyScene(activeProfile.id, scene.id)}
+              onPress={() => handleApplyScene(activeProfile.id, scene.id)}
             />
           ))}
         </ScrollView>
@@ -291,6 +367,8 @@ export default function Home() {
         onColorChange={handleColorChange}
         onColorCommit={handleColorCommit}
         onSourceChange={handleSourceChange}
+        onPlayback={handlePlayback}
+        onMuteToggle={handleMuteToggle}
         onRemove={detailDevice?.userAdded ? handleRemoveDevice : undefined}
       />
 
