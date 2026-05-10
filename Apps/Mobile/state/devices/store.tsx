@@ -22,6 +22,8 @@ export type DeviceSnapshot = {
   // Source-driven devices (TV, speaker)
   inputSource?: string;
   availableSources?: string[];
+  currentApp?: string;
+  availableApps?: string[];
   // Whether the user added this device after seeding (controls "remove" affordance)
   userAdded?: boolean;
 };
@@ -64,8 +66,15 @@ export const PROFILE_SCENES: Record<ProfileId, SceneDefinition[]> = {
       backgroundUrl:
         'https://images.unsplash.com/photo-1595769816263-9b910be24d5f?q=80&w=400&auto=format&fit=crop',
       presets: {
-        'living-room-tv': { enabled: true, level: 65 },
-        ambiance: { enabled: true, level: 12, colorMode: 'white', colorTemperatureK: 2700 },
+        'living-room-tv': { enabled: true, level: 58 },
+        ambiance: {
+          enabled: true,
+          level: 14,
+          colorMode: 'white',
+          colorTemperatureK: 2800,
+          hue: 32,
+          saturation: 18,
+        },
         'sound-system': { enabled: false, level: 0 },
       },
     },
@@ -78,10 +87,16 @@ export const PROFILE_SCENES: Record<ProfileId, SceneDefinition[]> = {
       overlayDark: true,
       presets: {
         'living-room-tv': { enabled: false },
-        ambiance: { enabled: true, level: 80, colorMode: 'color', hue: 275, saturation: 95 },
-        'sound-system': { enabled: true, level: 85 },
+        ambiance: {
+          enabled: true,
+          level: 88,
+          colorMode: 'color',
+          hue: 318,
+          saturation: 100,
+          colorTemperatureK: 3200,
+        },
+        'sound-system': { enabled: true, level: 86 },
       },
-      actions: [{ deviceId: 'sound-system', command: 'PLAY' }],
     },
   ],
   'guest-alex': [
@@ -92,9 +107,16 @@ export const PROFILE_SCENES: Record<ProfileId, SceneDefinition[]> = {
       backgroundUrl:
         'https://images.unsplash.com/photo-1511512578047-dfb367046420?q=80&w=400&auto=format&fit=crop',
       presets: {
-        'living-room-tv': { enabled: true, level: 70 },
-        ambiance: { enabled: true, level: 65 },
-        'sound-system': { enabled: true, level: 72 },
+        'living-room-tv': { enabled: true, level: 72 },
+        ambiance: {
+          enabled: true,
+          level: 58,
+          colorMode: 'color',
+          hue: 205,
+          saturation: 92,
+          colorTemperatureK: 4000,
+        },
+        'sound-system': { enabled: true, level: 78 },
       },
     },
     {
@@ -105,8 +127,15 @@ export const PROFILE_SCENES: Record<ProfileId, SceneDefinition[]> = {
         'https://images.unsplash.com/photo-1497032628192-86f99bcd76bc?q=80&w=400&auto=format&fit=crop',
       presets: {
         'living-room-tv': { enabled: false, level: 0 },
-        ambiance: { enabled: true, level: 35 },
-        'sound-system': { enabled: true, level: 18 },
+        ambiance: {
+          enabled: true,
+          level: 34,
+          colorMode: 'white',
+          colorTemperatureK: 5100,
+          hue: 210,
+          saturation: 12,
+        },
+        'sound-system': { enabled: true, level: 16 },
       },
     },
   ],
@@ -119,9 +148,16 @@ export const PROFILE_SCENES: Record<ProfileId, SceneDefinition[]> = {
         'https://images.unsplash.com/photo-1513694203232-719a981e7f78?q=80&w=400&auto=format&fit=crop',
       overlayDark: true,
       presets: {
-        'living-room-tv': { enabled: true, level: 38 },
-        ambiance: { enabled: true, level: 28 },
-        'sound-system': { enabled: true, level: 32 },
+        'living-room-tv': { enabled: true, level: 36 },
+        ambiance: {
+          enabled: true,
+          level: 24,
+          colorMode: 'white',
+          colorTemperatureK: 2950,
+          hue: 24,
+          saturation: 22,
+        },
+        'sound-system': { enabled: true, level: 28 },
       },
     },
     {
@@ -131,9 +167,16 @@ export const PROFILE_SCENES: Record<ProfileId, SceneDefinition[]> = {
       backgroundUrl:
         'https://images.unsplash.com/photo-1556912173-46c336c7fd55?q=80&w=400&auto=format&fit=crop',
       presets: {
-        'living-room-tv': { enabled: true, level: 58 },
-        ambiance: { enabled: true, level: 72 },
-        'sound-system': { enabled: true, level: 62 },
+        'living-room-tv': { enabled: true, level: 54 },
+        ambiance: {
+          enabled: true,
+          level: 76,
+          colorMode: 'white',
+          colorTemperatureK: 4300,
+          hue: 45,
+          saturation: 10,
+        },
+        'sound-system': { enabled: true, level: 60 },
       },
     },
   ],
@@ -230,6 +273,7 @@ type DevicesAction =
   | { type: 'set-color-temperature'; deviceId: DeviceId; kelvin: number }
   | { type: 'set-color'; deviceId: DeviceId; hue: number; saturation: number }
   | { type: 'set-input-source'; deviceId: DeviceId; source: string }
+  | { type: 'set-current-app'; deviceId: DeviceId; app: string }
   | { type: 'add-device'; device: DeviceSnapshot }
   | { type: 'remove-device'; deviceId: DeviceId }
   | { type: 'set-active-profile'; profileId: ProfileId }
@@ -317,6 +361,18 @@ const reducer = (state: DevicesState, action: DevicesAction): DevicesState => {
         devices: {
           ...state.devices,
           [action.deviceId]: { ...current, inputSource: action.source },
+        },
+      };
+    }
+    case 'set-current-app': {
+      const current = state.devices[action.deviceId];
+      if (!current) return state;
+      if (current.currentApp === action.app) return state;
+      return {
+        ...state,
+        devices: {
+          ...state.devices,
+          [action.deviceId]: { ...current, currentApp: action.app },
         },
       };
     }
@@ -410,6 +466,7 @@ type DevicesContextValue = {
   setColorTemperature: (deviceId: DeviceId, kelvin: number) => void;
   setColor: (deviceId: DeviceId, hue: number, saturation: number) => void;
   setInputSource: (deviceId: DeviceId, source: string) => void;
+  setCurrentApp: (deviceId: DeviceId, app: string) => void;
   addDevice: (device: DeviceSnapshot) => void;
   removeDevice: (deviceId: DeviceId) => void;
   setActiveProfile: (profileId: ProfileId) => void;
@@ -435,6 +492,7 @@ export function DevicesProvider({ children }: { children: React.ReactNode }) {
       setColor: (deviceId, hue, saturation) =>
         dispatch({ type: 'set-color', deviceId, hue, saturation }),
       setInputSource: (deviceId, source) => dispatch({ type: 'set-input-source', deviceId, source }),
+      setCurrentApp: (deviceId, app) => dispatch({ type: 'set-current-app', deviceId, app }),
       addDevice: (device) => dispatch({ type: 'add-device', device }),
       removeDevice: (deviceId) => dispatch({ type: 'remove-device', deviceId }),
       setActiveProfile: (profileId) => dispatch({ type: 'set-active-profile', profileId }),

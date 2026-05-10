@@ -30,6 +30,7 @@ import DeviceDetailModal from '../components/control/DeviceDetailModal';
 import COLORS from '../constants/Colors';
 import { useDevices } from '../hooks/useDevices';
 import { useLatestCommand } from '../hooks/useLatestCommand';
+import { usePlayback } from '../hooks/usePlayback';
 import { useTransport } from '../hooks/useTransport';
 import type { ConsoleCommandEnvelope, ConsoleCommandToken } from '../services/transport/types';
 import { PROFILE_SCENES } from '../state/devices/store';
@@ -102,6 +103,7 @@ export default function Home() {
     applyScene,
     activeProfile,
   } = useDevices();
+  const { nowPlaying } = usePlayback();
   const { send } = useTransport();
   const latest = useLatestCommand();
   const { config } = useRepositories();
@@ -109,6 +111,7 @@ export default function Home() {
   const [detailOpen, setDetailOpen] = useState(false);
   const [detailId, setDetailId] = useState<DeviceId | null>(null);
   const [addOpen, setAddOpen] = useState(false);
+  const visibleDevices = orderedDevices.filter((device) => device.id !== 'sound-system');
 
   const dispatchCommand = useCallback(
     (
@@ -189,6 +192,14 @@ export default function Home() {
       applyScene(profileId, sceneId);
       const sceneDef = PROFILE_SCENES[profileId].find((s) => s.id === sceneId);
       if (!sceneDef) return;
+
+      // Legacy presets used to send raw speaker PLAY commands, which can resurrect
+      // Unity's last loaded clip without any real now-playing metadata. If the app
+      // is not actively tracking a song, clear stale speaker playback first.
+      if (!nowPlaying?.isPlaying) {
+        dispatchCommand('sound-system', 'STOP');
+      }
+
       for (const [deviceId, partial] of Object.entries(sceneDef.presets) as Array<
         [DeviceId, Partial<DeviceSnapshot> | undefined]
       >) {
@@ -214,7 +225,7 @@ export default function Home() {
         }, 400);
       }
     },
-    [applyScene, dispatchCommand]
+    [applyScene, dispatchCommand, nowPlaying?.isPlaying]
   );
 
   const handleAddDevice = async (input: NewDeviceInput) => {
@@ -234,7 +245,10 @@ export default function Home() {
     try {
       const response = await fetch(`${config.backendUrl}/api/devices`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'X-HEMS-Client': 'mobile-app',
+        },
         body: JSON.stringify(body),
       });
       const data = (await response.json()) as { success?: boolean; device?: RawDevice };
@@ -326,7 +340,7 @@ export default function Home() {
         </View>
 
         <View style={styles.controlsList}>
-          {orderedDevices.map((device) => (
+          {visibleDevices.map((device) => (
             <ControlCard
               key={device.id}
               device={device}

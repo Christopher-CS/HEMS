@@ -9,7 +9,9 @@ export type BackendCommandPayload = {
   payload?: Record<string, unknown>;
 };
 
-const TOKEN_TO_TYPE: Record<ConsoleCommandToken, string> = {
+const TOKEN_TO_TYPE: Record<Exclude<ConsoleCommandToken, 'POWER_TOGGLE'>, string> & {
+  POWER_TOGGLE: string;
+} = {
   POWER_TOGGLE:       'power',
   NAVIGATE_BACK:      'navigate',
   OPEN_NUMBER_PAD:    'navigate',
@@ -20,8 +22,8 @@ const TOKEN_TO_TYPE: Record<ConsoleCommandToken, string> = {
   DPAD_LEFT:          'navigate',
   DPAD_RIGHT:         'navigate',
   DPAD_SELECT:        'navigate',
-  CHANNEL_UP:         'incrementLevel',
-  CHANNEL_DOWN:       'decrementLevel',
+  CHANNEL_UP:         'incrementChannel',
+  CHANNEL_DOWN:       'decrementChannel',
   VOLUME_UP:          'incrementLevel',
   VOLUME_DOWN:        'decrementLevel',
   GO_HOME:            'navigate',
@@ -33,39 +35,47 @@ const TOKEN_TO_TYPE: Record<ConsoleCommandToken, string> = {
   SET_HUE:            'setHue',
   SET_SATURATION:     'setSaturation',
   SET_INPUT_SOURCE:   'setMode',
+  SET_CHANNEL:        'setChannel',
+  LAUNCH_APP:         'launchApp',
   STOP:               'playback',
   TOGGLE_MUTE:        'toggleMute',
   CONNECT_DEVICE:     'connectDevice',
   DISCONNECT_DEVICE:  'disconnectDevice',
-  LIBRARY_PLAY:       'playback',
-  LIBRARY_QUEUE:      'playback',
-  LIBRARY_PREVIEW:    'playback',
+  LIBRARY_PLAY:       'playMedia',
+  LIBRARY_QUEUE:      'playMedia',
+  LIBRARY_PREVIEW:    'playMedia',
 };
 
-const CHANNEL_TARGET = 'channel';
 const VOLUME_TARGET = 'volume';
 
 const buildPayload = (envelope: ConsoleCommandEnvelope): Record<string, unknown> | undefined => {
   switch (envelope.command) {
     case 'POWER_TOGGLE':
-      return { powerState: envelope.value === 1 ? 'on' : 'off' };
+      return typeof envelope.value === 'number'
+        ? { powerState: envelope.value === 1 ? 'on' : 'off' }
+        : undefined;
     case 'STOP':
       return { action: 'stop' };
     case 'PAUSE':
       return { action: 'pause' };
     case 'PLAY':
+      return { action: 'play' };
     case 'LIBRARY_PLAY':
     case 'LIBRARY_QUEUE':
     case 'LIBRARY_PREVIEW':
-      return { action: 'play' };
+      return {
+        mediaId: envelope.mediaId,
+        category: envelope.category,
+        metadata: envelope.metadata,
+      };
     case 'SEEK_TO':
-      return { action: 'play' };
-    case 'CHANNEL_UP':
+      return typeof envelope.value === 'number' ? { action: 'seek', positionSeconds: envelope.value } : undefined;
     case 'VOLUME_UP':
       return { target: VOLUME_TARGET };
-    case 'CHANNEL_DOWN':
     case 'VOLUME_DOWN':
       return { target: VOLUME_TARGET };
+    case 'SET_CHANNEL':
+      return typeof envelope.value === 'number' ? { channel: envelope.value } : undefined;
     case 'NAVIGATE_BACK':
       return { direction: 'back' };
     case 'GO_HOME':
@@ -92,6 +102,8 @@ const buildPayload = (envelope: ConsoleCommandEnvelope): Record<string, unknown>
       return typeof envelope.value === 'number' ? { saturation: envelope.value } : undefined;
     case 'SET_INPUT_SOURCE':
       return envelope.metadata?.subtitle ? { mode: envelope.metadata.subtitle } : undefined;
+    case 'LAUNCH_APP':
+      return envelope.metadata?.title ? { app: envelope.metadata.title } : undefined;
     case 'CONNECT_DEVICE':
     case 'DISCONNECT_DEVICE':
       return envelope.metadata
@@ -103,9 +115,14 @@ const buildPayload = (envelope: ConsoleCommandEnvelope): Record<string, unknown>
 };
 
 export function mapEnvelopeToBackend(envelope: ConsoleCommandEnvelope): BackendCommandPayload {
+  const type =
+    envelope.command === 'POWER_TOGGLE' && typeof envelope.value !== 'number'
+      ? 'togglePower'
+      : TOKEN_TO_TYPE[envelope.command];
+
   return {
     deviceId: envelope.deviceId,
-    type: TOKEN_TO_TYPE[envelope.command],
+    type,
     payload: buildPayload(envelope),
   };
 }

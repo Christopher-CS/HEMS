@@ -24,6 +24,8 @@ export const REMOTE_COMMAND_TOKENS = [
   'SET_HUE',
   'SET_SATURATION',
   'SET_INPUT_SOURCE',
+  'SET_CHANNEL',
+  'LAUNCH_APP',
   'STOP',
   'TOGGLE_MUTE',
   'CONNECT_DEVICE',
@@ -53,6 +55,9 @@ export type ConsoleCommandEnvelope = {
     title: string;
     subtitle?: string;
     durationSeconds?: number;
+    artworkUrl?: string;
+    /** Music only: relative `/audio/...` or absolute URL for local playback (expo-av). */
+    audioUrl?: string;
   };
 };
 

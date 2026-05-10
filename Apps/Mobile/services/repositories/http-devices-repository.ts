@@ -1,5 +1,5 @@
-import type { DeviceProjection, DevicesRepository } from './devices-repository';
-import { mapDevice, type RawDevice } from './mappers';
+import type { DevicesRepository, DevicesResult } from './devices-repository';
+import { mapDevice, mapPlayback, type RawDevice } from './mappers';
 
 export type HttpDevicesRepositoryOptions = {
   baseUrl: string;
@@ -11,14 +11,23 @@ export function createHttpDevicesRepository({
   fetchImpl = fetch,
 }: HttpDevicesRepositoryOptions): DevicesRepository {
   return {
-    async fetchDevices(): Promise<DeviceProjection[]> {
-      const response = await fetchImpl(`${baseUrl}/api/devices`);
+    async fetchDevices(): Promise<DevicesResult> {
+      const response = await fetchImpl(`${baseUrl}/api/devices`, {
+        headers: { 'X-HEMS-Client': 'mobile-app' },
+      });
       if (!response.ok) {
         throw new Error(`Devices request failed: ${response.status}`);
       }
       const raw = (await response.json()) as { devices?: RawDevice[] } | RawDevice[];
       const list: RawDevice[] = Array.isArray(raw) ? raw : raw.devices ?? [];
-      return list.map(mapDevice).filter((d) => d.id.length > 0);
+      const playbackDevice =
+        list.find((device) => device.slug === 'living-room-tv') ??
+        list.find((device) => device.type === 'tv');
+
+      return {
+        projections: list.map(mapDevice).filter((d) => d.id.length > 0),
+        playback: playbackDevice ? mapPlayback(playbackDevice) : null,
+      };
     },
   };
 }

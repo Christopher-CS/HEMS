@@ -10,43 +10,62 @@ import { useRouter } from 'expo-router';
 import { Image } from 'expo-image';
 import {
   ChevronRight,
-  Clapperboard,
   Mic2,
   Music,
   Play,
+  Tv,
 } from 'lucide-react-native';
 import TopBar from '../../components/TopBar';
 import StatusBanner from '../../components/StatusBanner';
+import QueuePanel from '../../components/library/QueuePanel';
 import COLORS from '../../constants/Colors';
 import { useDevices } from '../../hooks/useDevices';
 import { useLibrary } from '../../hooks/useLibrary';
+import { usePlayback } from '../../hooks/usePlayback';
+import { useQueueController } from '../../hooks/useQueueController';
 import { useTransport } from '../../hooks/useTransport';
 import { buildLibraryCommand } from '../../utils/library-command-adapter';
+import {
+  resolveLibraryItem,
+  toQueuedMedia,
+  toQueuedMediaFromNowPlaying,
+} from '../../utils/library-queue';
 import type { LibraryActionType, MediaCategory, MediaItem, RecentMediaRef } from '../../types/media';
 
 type CategoryDef = {
-  id: MediaCategory;
+  id: MediaCategory | 'smart-menu';
   title: string;
   description: string;
   count: number;
   icon: React.ReactNode;
   accent: string;
   tint: string;
-  route: '/library/music' | '/library/movies' | '/library/podcasts';
+  route: '/library/music' | '/library/smart-menu' | '/library/podcasts';
 };
 
 export default function LibraryHub() {
   const router = useRouter();
-  const { music, movies, podcasts, recents, loading, error, refresh } = useLibrary();
-  const { primaryDeviceId } = useDevices();
+  const { music, podcasts, recents, loading, error, refresh } = useLibrary();
+  const { devices, primaryDeviceId } = useDevices();
+  const { nowPlaying, queue, enqueue, removeFromQueue, clearQueue } = usePlayback();
+  const { playQueued, playNextOrStop } = useQueueController();
   const { send } = useTransport();
+  const currentQueueItem = nowPlaying ? toQueuedMediaFromNowPlaying(nowPlaying) : null;
+  const smartMenuCount = (devices[primaryDeviceId]?.availableApps?.length ?? 7);
 
   const dispatchLibrary = useCallback(
     (action: LibraryActionType, item: MediaItem | RecentMediaRef, durationSeconds?: number) => {
-      const envelope = buildLibraryCommand(action, item, primaryDeviceId, durationSeconds);
+      const resolvedItem = resolveLibraryItem(item, music);
+
+      if (action === 'QUEUE') {
+        enqueue(toQueuedMedia(resolvedItem, durationSeconds));
+        return;
+      }
+
+      const envelope = buildLibraryCommand(action, resolvedItem, primaryDeviceId, durationSeconds);
       send(envelope).catch(() => {});
     },
-    [primaryDeviceId, send]
+    [enqueue, music, primaryDeviceId, send]
   );
 
   const categories: CategoryDef[] = [
@@ -61,14 +80,14 @@ export default function LibraryHub() {
       route: '/library/music',
     },
     {
-      id: 'movies',
-      title: 'Movies',
-      description: 'Feature films ready to play',
-      count: movies.length,
-      icon: <Clapperboard color={COLORS.text} size={24} />,
+      id: 'smart-menu',
+      title: 'Smart Menu',
+      description: 'Unity TV apps and consoles',
+      count: smartMenuCount,
+      icon: <Tv color={COLORS.text} size={24} />,
       accent: COLORS.orange,
       tint: COLORS.orangeSoft,
-      route: '/library/movies',
+      route: '/library/smart-menu',
     },
     {
       id: 'podcasts',
@@ -166,6 +185,27 @@ export default function LibraryHub() {
         )}
 
         <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>Queue</Text>
+          <Text style={styles.sectionHint}>Top plays first</Text>
+        </View>
+
+        <View style={styles.queueWrap}>
+          <QueuePanel
+            currentItem={currentQueueItem}
+            queue={queue}
+            onPlay={(index) => {
+              playQueued(index).catch(() => {});
+            }}
+            onRemove={removeFromQueue}
+            onRemoveCurrent={currentQueueItem ? () => {
+              playNextOrStop().catch(() => {});
+            } : undefined}
+            onClear={clearQueue}
+            emptyLabel="Queue items from Library and they will stack here in order."
+          />
+        </View>
+
+        <View style={styles.sectionHeader}>
           <Text style={styles.sectionTitle}>Quick actions</Text>
         </View>
 
@@ -183,26 +223,23 @@ export default function LibraryHub() {
             }}
           />
           <QuickAction
-            label="Resume last movie"
-            description="Jump back into your most recent film"
+            label="Open Netflix"
+            description="Jump straight into the Unity TV clip"
             accent={COLORS.orange}
             tint={COLORS.orangeSoft}
-            icon={<Clapperboard color={COLORS.orange} size={20} />}
+            icon={<Tv color={COLORS.orange} size={20} />}
             onPress={() => {
-              const firstMovieRecent = recents.find((media) => media.category === 'movies');
-              if (firstMovieRecent) {
-                dispatchLibrary('PLAY', firstMovieRecent, firstMovieRecent.durationSeconds);
-              }
+              router.push('/library/smart-menu');
             }}
           />
           <QuickAction
-            label="Queue latest episode"
-            description="Most recently published podcast"
-            accent={COLORS.purple}
-            tint={COLORS.purpleSoft}
-            icon={<Mic2 color={COLORS.purple} size={20} />}
+            label="Queue latest track"
+            description="Drop the newest music pick into the queue"
+            accent={COLORS.accent}
+            tint={COLORS.blueSoft}
+            icon={<Music color={COLORS.accent} size={20} />}
             onPress={() => {
-              const latest = podcasts[podcasts.length - 1];
+              const latest = music[music.length - 1];
               if (latest) dispatchLibrary('QUEUE', latest, latest.durationSeconds);
             }}
           />
@@ -452,6 +489,9 @@ const styles = StyleSheet.create({
   quickActionList: {
     paddingHorizontal: 20,
     gap: 10,
+  },
+  queueWrap: {
+    paddingHorizontal: 20,
   },
   quickActionCard: {
     flexDirection: 'row',

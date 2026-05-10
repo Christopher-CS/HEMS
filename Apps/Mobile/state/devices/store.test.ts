@@ -45,8 +45,10 @@ describe('devices reducer', () => {
     });
     expect(next.activeSceneByProfile.dad).toBe('party');
     expect(next.devices['living-room-tv'].enabled).toBe(false);
-    expect(next.devices['sound-system'].level).toBe(85);
-    expect(next.devices['ambiance'].level).toBe(80);
+    expect(next.devices['sound-system'].level).toBe(86);
+    expect(next.devices['ambiance'].level).toBe(88);
+    expect(next.devices.ambiance.colorMode).toBe('color');
+    expect(next.devices.ambiance.hue).toBe(318);
   });
 
   it('switches active profile to a guest under the main account', () => {
@@ -65,8 +67,9 @@ describe('devices reducer', () => {
       sceneId: 'cozy-evening',
     });
     expect(cozy.activeSceneByProfile['guest-mom']).toBe('cozy-evening');
-    expect(cozy.devices['living-room-tv'].level).toBe(38);
-    expect(cozy.devices.ambiance.level).toBe(28);
+    expect(cozy.devices['living-room-tv'].level).toBe(36);
+    expect(cozy.devices.ambiance.level).toBe(24);
+    expect(cozy.devices.ambiance.colorTemperatureK).toBe(2950);
 
     const hosting = reducer(cozy, {
       type: 'apply-scene',
@@ -74,8 +77,9 @@ describe('devices reducer', () => {
       sceneId: 'hosting',
     });
     expect(hosting.activeSceneByProfile['guest-mom']).toBe('hosting');
-    expect(hosting.devices['living-room-tv'].level).toBe(58);
-    expect(hosting.devices['sound-system'].level).toBe(62);
+    expect(hosting.devices['living-room-tv'].level).toBe(54);
+    expect(hosting.devices['sound-system'].level).toBe(60);
+    expect(hosting.devices.ambiance.colorTemperatureK).toBe(4300);
   });
 
   it('switches a light between white and color modes', () => {
@@ -132,6 +136,22 @@ describe('devices reducer', () => {
       source: 'VGA 1',
     });
     expect(rejected).toBe(INITIAL_DEVICES);
+  });
+
+  it('stores the active Unity app on the TV device', () => {
+    const next = reducer(INITIAL_DEVICES, {
+      type: 'set-current-app',
+      deviceId: 'living-room-tv',
+      app: 'Netflix',
+    });
+    expect(next.devices['living-room-tv'].currentApp).toBe('Netflix');
+
+    const cleared = reducer(next, {
+      type: 'set-current-app',
+      deviceId: 'living-room-tv',
+      app: '',
+    });
+    expect(cleared.devices['living-room-tv'].currentApp).toBe('');
   });
 
   it('adds and removes user-connected devices and updates ordering', () => {

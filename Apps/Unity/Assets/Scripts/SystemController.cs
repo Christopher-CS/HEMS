@@ -43,6 +43,8 @@ public class SystemController : MonoBehaviour
     void RouteAndPlayVideoPlayer()
     {
         if (_vpRouted) return;
+        if (_videoPlayer == null || !_videoPlayer.gameObject.activeInHierarchy) return;
+
         _vpRouted = true;
 
         Debug.Log("[TV] Routing VideoPlayer → TV_Audio and preparing...");
@@ -120,9 +122,8 @@ public class SystemController : MonoBehaviour
         screen.SetScreenActive(currentState.powerOn);
         if (currentState.powerOn)
         {
-            // Screen (and VP's GameObject) is now active — safe to prepare.
-            RouteAndPlayVideoPlayer();
             screen.SetText("TV on");
+            RefreshScreen();
         }
         else
         {
@@ -167,49 +168,117 @@ public class SystemController : MonoBehaviour
 
     public void SetMode(string mode)
     {
+        if (currentState.systemMode == mode) return;
         currentState.systemMode = mode;
         RefreshScreen();
     }
 
     public void SetTVApp(string appName)
     {
+        if (currentState.tv.selectedApp == appName) return;
         currentState.tv.selectedApp = appName;
         RefreshScreen();
     }
 
     public void SetConsole(string consoleName)
     {
+        if (currentState.gaming.selectedConsole == consoleName) return;
         currentState.gaming.selectedConsole = consoleName;
         RefreshScreen();
     }
 
+    public void SetChannel(int channelNumber)
+    {
+        int safe = Mathf.Clamp(channelNumber, 1, 999);
+        if (currentState.currentChannel == safe) return;
+
+        string message;
+        if (safe > currentState.currentChannel)
+            message = $"Channel Up  {safe}";
+        else if (safe < currentState.currentChannel)
+            message = $"Channel Down  {safe}";
+        else
+            message = $"Channel {safe}";
+
+        currentState.currentChannel = safe;
+
+        if (currentState.powerOn)
+            screen.ShowChannelToast(message);
+    }
+
     public void RefreshScreen()
     {
+        bool showingPanel = false;
+
         if (!currentState.powerOn)
         {
             screen.PowerOff();
             return;
         }
 
+        if (currentState.playbackStatus == "playing" && !string.IsNullOrEmpty(currentState.artworkUrl))
+        {
+            screen.ShowArtwork(currentState.artworkUrl);
+            return;
+        }
+
         if (currentState.systemMode == "TV")
         {
             if (currentState.tv.selectedApp == "Netflix")
+            {
                 screen.ShowNetflix();
+                showingPanel = true;
+            }
             else if (currentState.tv.selectedApp == "Prime Video")
+            {
                 screen.ShowPrime();
+                showingPanel = true;
+            }
             else if (currentState.tv.selectedApp == "Peacock")
+            {
                 screen.ShowPeacock();
+                showingPanel = true;
+            }
             else if (currentState.tv.selectedApp == "Disney")
+            {
                 screen.ShowDisney();
+                showingPanel = true;
+            }
+            else
+            {
+                screen.ShowPoweredOn();
+            }
         }
         else if (currentState.systemMode == "Gaming")
         {
             if (currentState.gaming.selectedConsole == "Xbox")
+            {
                 screen.ShowXbox();
+                showingPanel = true;
+            }
             else if (currentState.gaming.selectedConsole == "PlayStation")
+            {
                 screen.ShowPlayStation();
+                showingPanel = true;
+            }
             else if (currentState.gaming.selectedConsole == "Switch")
+            {
                 screen.ShowSwitch();
+                showingPanel = true;
+            }
+            else
+            {
+                screen.ShowPoweredOn();
+            }
+        }
+        else
+        {
+            screen.ShowPoweredOn();
+        }
+
+        if (showingPanel && !_vpRouted && _videoPlayer != null && _videoPlayer.gameObject.activeInHierarchy)
+        {
+            RouteAndPlayVideoPlayer();
         }
     }
 

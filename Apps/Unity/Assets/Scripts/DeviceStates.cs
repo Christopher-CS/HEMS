@@ -12,14 +12,19 @@ public class DeviceStates
     public TvState  tv = new TvState();
     public  GamingState gaming = new GamingState();
 
+    public string playbackStatus = "stopped";
+    public string artworkUrl = "";
+    public string audioUrl = "";
+    public float playbackPosition = 0f;
+    public int currentChannel = 4;
+
 
 }
 
 [Serializable]
 public class TvState
 {
-    
-    public string selectedApp = "Netflix";
+    public string selectedApp = "";
 }
 
 [Serializable]

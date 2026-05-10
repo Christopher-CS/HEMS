@@ -98,6 +98,35 @@ describe('ConsoleTransport contract', () => {
 });
 
 describe('mapEnvelopeToBackend', () => {
+  it('uses togglePower when POWER_TOGGLE is issued without an explicit value', () => {
+    expect(
+      mapEnvelopeToBackend({
+        type: 'ConsoleCommand',
+        deviceId: 'living-room-tv',
+        command: 'POWER_TOGGLE',
+      })
+    ).toEqual({
+      deviceId: 'living-room-tv',
+      type: 'togglePower',
+      payload: undefined,
+    });
+  });
+
+  it('preserves explicit power set commands when POWER_TOGGLE includes a value', () => {
+    expect(
+      mapEnvelopeToBackend({
+        type: 'ConsoleCommand',
+        deviceId: 'living-room-tv',
+        command: 'POWER_TOGGLE',
+        value: 1,
+      })
+    ).toEqual({
+      deviceId: 'living-room-tv',
+      type: 'power',
+      payload: { powerState: 'on' },
+    });
+  });
+
   it('maps remote level commands to incrementLevel/decrementLevel', () => {
     expect(mapEnvelopeToBackend(ENVELOPE).type).toBe('incrementLevel');
     expect(
@@ -105,8 +134,40 @@ describe('mapEnvelopeToBackend', () => {
     ).toBe('decrementLevel');
   });
 
+  it('maps channel commands separately from volume commands', () => {
+    expect(
+      mapEnvelopeToBackend({ ...ENVELOPE, command: 'CHANNEL_UP' })
+    ).toEqual({
+      deviceId: ENVELOPE.deviceId,
+      type: 'incrementChannel',
+      payload: undefined,
+    });
+    expect(
+      mapEnvelopeToBackend({ ...ENVELOPE, command: 'CHANNEL_DOWN' })
+    ).toEqual({
+      deviceId: ENVELOPE.deviceId,
+      type: 'decrementChannel',
+      payload: undefined,
+    });
+  });
+
+  it('maps SET_CHANNEL to a backend setChannel payload', () => {
+    expect(
+      mapEnvelopeToBackend({
+        type: 'ConsoleCommand',
+        deviceId: 'living-room-tv',
+        command: 'SET_CHANNEL',
+        value: 12,
+      })
+    ).toEqual({
+      deviceId: 'living-room-tv',
+      type: 'setChannel',
+      payload: { channel: 12 },
+    });
+  });
+
   it('threads SEEK_TO value into payload.positionSeconds', () => {
-    expect(mapEnvelopeToBackend(SEEK_ENVELOPE).payload).toEqual({ positionSeconds: 75 });
+    expect(mapEnvelopeToBackend(SEEK_ENVELOPE).payload).toEqual({ action: 'seek', positionSeconds: 75 });
   });
 
   it('flattens DPAD_* into a payload direction', () => {
@@ -140,6 +201,23 @@ describe('mapEnvelopeToBackend', () => {
       mediaId: 'track-001',
       category: 'music',
       metadata: expect.objectContaining({ title: 'Midnight Drive' }),
+    });
+  });
+
+  it('maps LAUNCH_APP to the backend launchApp command with the selected app name', () => {
+    expect(
+      mapEnvelopeToBackend({
+        type: 'ConsoleCommand',
+        deviceId: 'living-room-tv',
+        command: 'LAUNCH_APP',
+        metadata: {
+          title: 'Netflix',
+        },
+      })
+    ).toEqual({
+      deviceId: 'living-room-tv',
+      type: 'launchApp',
+      payload: { app: 'Netflix' },
     });
   });
 });

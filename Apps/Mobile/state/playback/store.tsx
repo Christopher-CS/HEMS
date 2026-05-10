@@ -10,11 +10,15 @@ export type NowPlaying = {
   positionSeconds: number;
   isPlaying: boolean;
   artworkUrl?: string;
+  /** Resolved from library metadata when present — used by LibraryAudioPlayer. */
+  audioUrl?: string;
 };
+
+export type QueuedMedia = Omit<NowPlaying, 'positionSeconds' | 'isPlaying'>;
 
 export type PlaybackState = {
   current: NowPlaying | null;
-  queue: Array<Omit<NowPlaying, 'positionSeconds' | 'isPlaying'>>;
+  queue: QueuedMedia[];
 };
 
 const INITIAL_PLAYBACK: PlaybackState = {
@@ -24,8 +28,10 @@ const INITIAL_PLAYBACK: PlaybackState = {
 
 type PlaybackAction =
   | { type: 'set-now-playing'; media: NowPlaying }
-  | { type: 'enqueue'; media: Omit<NowPlaying, 'positionSeconds' | 'isPlaying'> }
+  | { type: 'clear-now-playing' }
+  | { type: 'enqueue'; media: QueuedMedia }
   | { type: 'clear-queue' }
+  | { type: 'remove-from-queue'; index: number }
   | { type: 'set-position'; positionSeconds: number }
   | { type: 'set-playing'; isPlaying: boolean }
   | { type: 'reset' };
@@ -37,10 +43,19 @@ const reducer = (state: PlaybackState, action: PlaybackAction): PlaybackState =>
   switch (action.type) {
     case 'set-now-playing':
       return { ...state, current: action.media };
+    case 'clear-now-playing':
+      if (!state.current) return state;
+      return { ...state, current: null };
     case 'enqueue':
       return { ...state, queue: [...state.queue, action.media] };
     case 'clear-queue':
       return { ...state, queue: [] };
+    case 'remove-from-queue':
+      if (action.index < 0 || action.index >= state.queue.length) return state;
+      return {
+        ...state,
+        queue: state.queue.filter((_, index) => index !== action.index),
+      };
     case 'set-position': {
       if (!state.current) return state;
       const next = clampPosition(action.positionSeconds, state.current.durationSeconds);
@@ -68,8 +83,10 @@ const reducer = (state: PlaybackState, action: PlaybackAction): PlaybackState =>
 type PlaybackContextValue = {
   state: PlaybackState;
   setNowPlaying: (media: NowPlaying) => void;
-  enqueue: (media: Omit<NowPlaying, 'positionSeconds' | 'isPlaying'>) => void;
+  clearNowPlaying: () => void;
+  enqueue: (media: QueuedMedia) => void;
   clearQueue: () => void;
+  removeFromQueue: (index: number) => void;
   setPosition: (positionSeconds: number) => void;
   setPlaying: (isPlaying: boolean) => void;
   reset: () => void;
@@ -84,8 +101,10 @@ export function PlaybackProvider({ children }: { children: React.ReactNode }) {
     () => ({
       state,
       setNowPlaying: (media) => dispatch({ type: 'set-now-playing', media }),
+      clearNowPlaying: () => dispatch({ type: 'clear-now-playing' }),
       enqueue: (media) => dispatch({ type: 'enqueue', media }),
       clearQueue: () => dispatch({ type: 'clear-queue' }),
+      removeFromQueue: (index) => dispatch({ type: 'remove-from-queue', index }),
       setPosition: (positionSeconds) => dispatch({ type: 'set-position', positionSeconds }),
       setPlaying: (isPlaying) => dispatch({ type: 'set-playing', isPlaying }),
       reset: () => dispatch({ type: 'reset' }),

@@ -1,10 +1,13 @@
 import { INITIAL_DEVICES } from '../../state/devices/store';
-import type { DeviceProjection, DevicesRepository } from './devices-repository';
+import type { DevicesRepository, DevicesResult } from './devices-repository';
 
 export function createMockDevicesRepository(): DevicesRepository {
   return {
-    async fetchDevices(): Promise<DeviceProjection[]> {
-      return Object.values(INITIAL_DEVICES.devices);
+    async fetchDevices(): Promise<DevicesResult> {
+      return {
+        projections: Object.values(INITIAL_DEVICES.devices),
+        playback: null,
+      };
     },
   };
 }

@@ -4,9 +4,10 @@ import { mapEnvelopeToBackend } from './command-mapping';
 const SUPPORTED_TYPES = new Set([
   'togglePower', 'power',
   'setLevel', 'incrementLevel', 'decrementLevel',
+  'setChannel', 'incrementChannel', 'decrementChannel',
   'setMode', 'cycleMode',
   'move', 'launchApp',
-  'playback', 'toggleMute',
+  'playback', 'playMedia', 'toggleMute',
   'navigate',
   'setColorMode', 'setColorTemperature', 'setHue', 'setSaturation',
 ]);
@@ -35,7 +36,10 @@ export function createHttpTransport({ baseUrl, onCommand }: HttpTransportOptions
       try {
         const response = await fetch(`${baseUrl}/api/commands`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            'X-HEMS-Client': 'mobile-app',
+          },
           body: JSON.stringify({
             device: backend.deviceId,
             issuedBy: 'app',

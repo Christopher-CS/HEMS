@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -10,13 +10,20 @@ import {
 import { Search } from 'lucide-react-native';
 import CategoryHeader from '../../components/library/category-header';
 import MediaCard from '../../components/library/media-card';
+import QueuePanel from '../../components/library/QueuePanel';
 import StatusBanner from '../../components/StatusBanner';
 import COLORS from '../../constants/Colors';
 import { formatDuration } from '../../data/media-library';
 import { useDevices } from '../../hooks/useDevices';
 import { useLibrary } from '../../hooks/useLibrary';
+import { usePlayback } from '../../hooks/usePlayback';
+import { useQueueController } from '../../hooks/useQueueController';
 import { useTransport } from '../../hooks/useTransport';
 import { buildLibraryCommand } from '../../utils/library-command-adapter';
+import {
+  toQueuedMedia,
+  toQueuedMediaFromNowPlaying,
+} from '../../utils/library-queue';
 import type { MusicTrack } from '../../types/media';
 
 const ACCENT = COLORS.accent;
@@ -26,7 +33,10 @@ export default function MusicPage() {
   const [activeGenre, setActiveGenre] = useState<string>('All');
   const { music, loading, error, refresh } = useLibrary();
   const { primaryDeviceId } = useDevices();
+  const { nowPlaying, queue, enqueue, removeFromQueue, clearQueue } = usePlayback();
+  const { playQueued, playNextOrStop } = useQueueController();
   const { send } = useTransport();
+  const currentQueueItem = nowPlaying ? toQueuedMediaFromNowPlaying(nowPlaying) : null;
 
   const genres = useMemo(() => {
     const set = new Set<string>();
@@ -50,15 +60,25 @@ export default function MusicPage() {
     });
   }, [query, activeGenre, music]);
 
+  const handleAction = useCallback(
+    (action: 'PLAY' | 'QUEUE' | 'PREVIEW', item: MusicTrack) => {
+      if (action === 'QUEUE') {
+        enqueue(toQueuedMedia(item, item.durationSeconds));
+        return;
+      }
+
+      const envelope = buildLibraryCommand(action, item, primaryDeviceId, item.durationSeconds);
+      send(envelope).catch(() => {});
+    },
+    [enqueue, primaryDeviceId, send]
+  );
+
   const renderItem = ({ item }: { item: MusicTrack }) => (
     <MediaCard
       item={item}
       accentColor={ACCENT}
       metaLines={[`${item.artist} · ${item.album}`, formatDuration(item.durationSeconds)]}
-      onAction={(action) => {
-        const envelope = buildLibraryCommand(action, item, primaryDeviceId, item.durationSeconds);
-        send(envelope).catch(() => {});
-      }}
+      onAction={(action) => handleAction(action, item)}
     />
   );
 
@@ -121,6 +141,23 @@ export default function MusicPage() {
           );
         }}
       />
+
+      <View style={styles.queueWrap}>
+        <QueuePanel
+          currentItem={currentQueueItem}
+          queue={queue}
+          onPlay={(index) => {
+            playQueued(index).catch(() => {});
+          }}
+          onRemove={removeFromQueue}
+          onRemoveCurrent={currentQueueItem ? () => {
+            playNextOrStop().catch(() => {});
+          } : undefined}
+          onClear={clearQueue}
+          title="Music Queue"
+          emptyLabel="Queue tracks here and they will stack in play order."
+        />
+      </View>
 
       <FlatList
         data={filtered}
@@ -198,6 +235,10 @@ const styles = StyleSheet.create({
   listContent: {
     paddingHorizontal: 20,
     paddingBottom: 40,
+  },
+  queueWrap: {
+    paddingHorizontal: 20,
+    paddingBottom: 14,
   },
   empty: {
     alignItems: 'center',

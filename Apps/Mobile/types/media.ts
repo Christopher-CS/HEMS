@@ -14,6 +14,8 @@ export interface MusicTrack extends MediaItemBase {
   artist: string;
   album: string;
   genre?: string;
+  /** Optional stream URL: absolute https URL or path starting with `/` (resolved with backend base URL). */
+  audioUrl?: string;
 }
 
 export interface Movie extends MediaItemBase {
@@ -29,6 +31,7 @@ export interface PodcastEpisode extends MediaItemBase {
   showName: string;
   episodeNumber?: number;
   publishedOn?: string;
+  audioUrl?: string;
 }
 
 export type MediaItem = MusicTrack | Movie | PodcastEpisode;
@@ -42,5 +45,6 @@ export interface RecentMediaRef {
   subtitle: string;
   durationSeconds: number;
   artworkUrl?: string;
+  audioUrl?: string;
   progress?: number;
 }

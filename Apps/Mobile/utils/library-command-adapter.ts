@@ -19,6 +19,7 @@ export function buildLibraryCommand(
   deviceId: string,
   durationSeconds?: number
 ): ConsoleCommandEnvelope {
+  const baseDuration = durationSeconds ?? ('durationSeconds' in item ? item.durationSeconds : undefined);
   return {
     type: 'ConsoleCommand',
     deviceId,
@@ -28,7 +29,15 @@ export function buildLibraryCommand(
     metadata: {
       title: item.title,
       subtitle: item.subtitle,
-      durationSeconds,
+      durationSeconds: baseDuration,
+      ...('artworkUrl' in item && item.artworkUrl ? { artworkUrl: item.artworkUrl } : {}),
+      ...(
+        (item.category === 'music' || item.category === 'podcasts') &&
+        'audioUrl' in item &&
+        item.audioUrl
+          ? { audioUrl: item.audioUrl }
+          : {}
+      ),
     },
   };
 }

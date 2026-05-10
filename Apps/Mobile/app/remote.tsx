@@ -1,7 +1,8 @@
 import Slider from '@react-native-community/slider';
-import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Home, Pause, Play, Power, Radio, } from 'lucide-react-native';
+import { ArrowLeft, ChevronDown, ChevronLeft, ChevronRight, ChevronUp, Home, Pause, Play, Power, Radio, SkipForward, X } from 'lucide-react-native';
 import React, { useCallback, useState } from 'react';
-import { Pressable, StyleSheet, Text, View, } from 'react-native';
+import { Modal, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image } from 'expo-image';
 import TopBar from '../components/TopBar';
 import StatusBanner from '../components/StatusBanner';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +10,7 @@ import COLORS from '../constants/Colors';
 import { useDevices } from '../hooks/useDevices';
 import { useLatestCommand } from '../hooks/useLatestCommand';
 import { usePlayback } from '../hooks/usePlayback';
+import { useQueueController } from '../hooks/useQueueController';
 import { useTransport } from '../hooks/useTransport';
 import type {
   ConsoleCommandEnvelope,
@@ -30,11 +32,14 @@ function formatTime(totalSeconds: number) {
 export default function Remote() {
   const { primaryDeviceId } = useDevices();
   const { nowPlaying, setPosition, setPlaying } = usePlayback();
+  const { playNextOrStop } = useQueueController();
   const { send } = useTransport();
   const latest = useLatestCommand();
 
   const duration = nowPlaying?.durationSeconds ?? FALLBACK_DURATION;
   const [scrubPosition, setScrubPosition] = useState<number | null>(null);
+  const [channelModalVisible, setChannelModalVisible] = useState(false);
+  const [channelInput, setChannelInput] = useState('');
   const displayedPosition = scrubPosition ?? nowPlaying?.positionSeconds ?? 0;
   const isPlaying = nowPlaying?.isPlaying ?? false;
 
@@ -66,6 +71,18 @@ export default function Remote() {
     setPosition(rounded);
     setScrubPosition(null);
     emitRemoteCommand('SEEK_TO', rounded);
+  };
+
+  const handleRemoveActive = () => {
+    playNextOrStop().catch(() => {});
+  };
+
+  const handleSubmitChannel = () => {
+    const next = Number.parseInt(channelInput, 10);
+    if (!Number.isInteger(next) || next < 1 || next > 999) return;
+    emitRemoteCommand('SET_CHANNEL', next);
+    setChannelModalVisible(false);
+    setChannelInput('');
   };
 
   return (
@@ -104,7 +121,7 @@ export default function Remote() {
             <View style={styles.cornerButtonBottomLeft}>
               <RoundButton
                 accessibilityLabel="Number pad"
-                onPress={() => emitRemoteCommand('OPEN_NUMBER_PAD')}
+                onPress={() => setChannelModalVisible(true)}
               >
                 <Text style={styles.numberPadText}>123</Text>
               </RoundButton>
@@ -122,7 +139,7 @@ export default function Remote() {
               </RoundButton>
             </View>
 
-            <View style={styles.dpadCenterContainer}>
+            <View pointerEvents="box-none" style={styles.dpadCenterContainer}>
               <DirectionalPad
                 onDirectionPress={(direction) => {
                   const token: ConsoleCommandToken =
@@ -173,7 +190,11 @@ export default function Remote() {
 
           <View style={styles.nowPlayingCard}>
             <View style={styles.nowPlayingHeader}>
-              <View style={styles.artwork} />
+              {nowPlaying?.artworkUrl ? (
+                <Image source={{ uri: nowPlaying.artworkUrl }} style={styles.artwork} contentFit="cover" />
+              ) : (
+                <View style={styles.artwork} />
+              )}
               <View style={styles.trackTextWrap}>
                 <Text numberOfLines={1} style={styles.trackTitle}>
                   {nowPlaying?.title ?? FALLBACK_TITLE}
@@ -182,6 +203,16 @@ export default function Remote() {
                   {nowPlaying?.subtitle ?? FALLBACK_SUBTITLE}
                 </Text>
               </View>
+              {nowPlaying ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${nowPlaying.title}`}
+                  onPress={handleRemoveActive}
+                  style={({ pressed }) => [styles.removeActiveButton, pressed && styles.buttonPressed]}
+                >
+                  <X color={COLORS.textMutedLight} size={14} strokeWidth={2.5} />
+                </Pressable>
+              ) : null}
             </View>
 
             <Slider
@@ -202,22 +233,82 @@ export default function Remote() {
               <Text style={styles.timeLabel}>{formatTime(duration)}</Text>
             </View>
 
-            <Pressable
-              style={styles.playerPauseButton}
-              onPress={handlePauseOrPlay}
-              accessibilityRole="button"
-              accessibilityLabel={isPlaying ? 'Pause playback' : 'Resume playback'}
-            >
-              {isPlaying ? (
-                <Pause color={COLORS.accent} size={28} strokeWidth={2.7} />
-              ) : (
-                <Play color={COLORS.accent} size={28} strokeWidth={2.7} />
-              )}
-            </Pressable>
+            <View style={styles.playerControlsRow}>
+              <Pressable
+                style={styles.playerControlButton}
+                onPress={handlePauseOrPlay}
+                accessibilityRole="button"
+                accessibilityLabel={isPlaying ? 'Pause playback' : 'Resume playback'}
+              >
+                {isPlaying ? (
+                  <Pause color={COLORS.accent} size={28} strokeWidth={2.7} />
+                ) : (
+                  <Play color={COLORS.accent} size={28} strokeWidth={2.7} />
+                )}
+              </Pressable>
+
+              <Pressable
+                style={styles.playerControlButton}
+                onPress={handleRemoveActive}
+                accessibilityRole="button"
+                accessibilityLabel="Skip to next"
+              >
+                <SkipForward color={COLORS.accent} size={26} strokeWidth={2.5} />
+              </Pressable>
+            </View>
           </View>
 
         </View>
       </SafeAreaView>
+
+      <Modal
+        visible={channelModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setChannelModalVisible(false)}
+      >
+        <View style={styles.modalRoot}>
+          <Pressable
+            style={styles.modalBackdrop}
+            accessibilityLabel="Close channel selector"
+            onPress={() => setChannelModalVisible(false)}
+          />
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitle}>Go To Channel</Text>
+            <Text style={styles.modalSubtitle}>Enter a channel number</Text>
+            <TextInput
+              value={channelInput}
+              onChangeText={(value) => setChannelInput(value.replace(/[^0-9]/g, '').slice(0, 3))}
+              style={styles.channelInput}
+              keyboardType="number-pad"
+              autoFocus
+              maxLength={3}
+              placeholder="4"
+              placeholderTextColor={COLORS.muted}
+              returnKeyType="done"
+              onSubmitEditing={handleSubmitChannel}
+            />
+            <View style={styles.modalActions}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cancel channel selection"
+                onPress={() => setChannelModalVisible(false)}
+                style={({ pressed }) => [styles.modalSecondaryButton, pressed && styles.buttonPressed]}
+              >
+                <Text style={styles.modalSecondaryLabel}>Cancel</Text>
+              </Pressable>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Go to selected channel"
+                onPress={handleSubmitChannel}
+                style={({ pressed }) => [styles.modalPrimaryButton, pressed && styles.buttonPressed]}
+              >
+                <Text style={styles.modalPrimaryLabel}>Go</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -581,6 +672,14 @@ const styles = StyleSheet.create({
   trackTextWrap: {
     flex: 1,
   },
+  removeActiveButton: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: COLORS.surfaceAlt,
+  },
   trackTitle: {
     color: COLORS.text,
     fontSize: 16,
@@ -608,11 +707,78 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '500',
   },
-  playerPauseButton: {
-    alignSelf: 'center',
+  playerControlsRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 10,
+  },
+  playerControlButton: {
     width: 42,
     height: 32,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  modalRoot: {
+    flex: 1,
+    justifyContent: 'center',
+    paddingHorizontal: 28,
+  },
+  modalBackdrop: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+  },
+  modalCard: {
+    backgroundColor: COLORS.surface,
+    borderRadius: 20,
+    padding: 20,
+  },
+  modalTitle: {
+    color: COLORS.text,
+    fontSize: 18,
+    fontWeight: '700',
+  },
+  modalSubtitle: {
+    color: COLORS.muted,
+    fontSize: 13,
+    marginTop: 4,
+    marginBottom: 14,
+  },
+  channelInput: {
+    backgroundColor: COLORS.background,
+    borderRadius: 14,
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    color: COLORS.text,
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: 1,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+    marginTop: 16,
+  },
+  modalSecondaryButton: {
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: COLORS.background,
+  },
+  modalSecondaryLabel: {
+    color: COLORS.textMutedLight,
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  modalPrimaryButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: COLORS.accent,
+  },
+  modalPrimaryLabel: {
+    color: COLORS.text,
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

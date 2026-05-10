@@ -21,7 +21,7 @@ using UnityEngine.Networking;
 public class HEMSBridge : MonoBehaviour
 {
     [Header("Backend")]
-    public string backendUrl = "http://localhost:4000";
+    public string backendUrl = "http://192.168.1.72:4000";
 
     [Header("Scene Controllers")]
     public LightController lightController;
@@ -72,10 +72,15 @@ public class HEMSBridge : MonoBehaviour
                 colorSaturation= device.colorState.saturation,
                 colorKelvin    = device.colorState.kelvin > 0 ? device.colorState.kelvin : 4000f,
                 modeCurrent    = device.mode.current,
-                // Never auto-play on initial load; playback is triggered explicitly by the user.
-                playbackStatus = "stopped",
+                playbackStatus = device.playbackState.status,
                 playbackMuted  = device.playbackState.isMuted,
+                playbackPosition = device.playbackState.position,
+                artworkUrl     = device.playbackState.nowPlaying != null ? device.playbackState.nowPlaying.artworkUrl : "",
+                audioUrl       = ResolveMediaUrl(device.playbackState.nowPlaying != null ? device.playbackState.nowPlaying.audioUrl : ""),
                 consoleApp     = device.consoleState.currentApp,
+                currentChannel = device.navigationState != null && device.navigationState.currentChannel > 0
+                    ? device.navigationState.currentChannel
+                    : 4,
             };
             ApplyMsg(msg);
         }
@@ -134,6 +139,7 @@ public class HEMSBridge : MonoBehaviour
                 var parsed = JsonUtility.FromJson<DeviceStateMsg>(msg);
                 if (parsed != null && !string.IsNullOrEmpty(parsed.slug))
                 {
+                    parsed.audioUrl = ResolveMediaUrl(parsed.audioUrl);
                     _liveUpdated.Add(parsed.slug);
                     ApplyMsg(parsed);
                 }
@@ -188,6 +194,17 @@ public class HEMSBridge : MonoBehaviour
 
     void ApplyTV(DeviceStateMsg msg)
     {
+        if (!string.IsNullOrWhiteSpace(msg.audioUrl))
+        {
+            Debug.Log(
+                $"[HEMS] TV playback update status={msg.playbackStatus} position={msg.playbackPosition} audioUrl={msg.audioUrl}"
+            );
+        }
+
+        speakerController.SetVolume(msg.levelCurrent / 100f);
+        speakerController.SetMute(msg.playbackMuted);
+        speakerController.SyncPlayback(msg.audioUrl, msg.playbackStatus, msg.playbackPosition);
+
         systemController.SetPower(msg.powerState == "on");
         systemController.SetVolume(Mathf.RoundToInt(msg.levelCurrent));
         systemController.SetMute(msg.playbackMuted);
@@ -195,13 +212,37 @@ public class HEMSBridge : MonoBehaviour
         if (!string.IsNullOrEmpty(msg.modeCurrent))
             systemController.SetMode(msg.modeCurrent);
 
-        if (!string.IsNullOrEmpty(msg.consoleApp))
+        var mode = !string.IsNullOrEmpty(msg.modeCurrent)
+            ? msg.modeCurrent
+            : systemController.currentState.systemMode;
+
+        if (mode == "Gaming")
         {
-            if (msg.modeCurrent == "Gaming")
-                systemController.SetConsole(msg.consoleApp);
-            else
-                systemController.SetTVApp(msg.consoleApp);
+            systemController.SetConsole(msg.consoleApp ?? "");
+            systemController.SetTVApp("");
         }
+        else
+        {
+            systemController.SetTVApp(msg.consoleApp ?? "");
+            systemController.SetConsole("");
+        }
+        systemController.currentState.artworkUrl = msg.artworkUrl;
+        systemController.currentState.audioUrl = msg.audioUrl;
+        systemController.currentState.playbackStatus = msg.playbackStatus;
+        systemController.currentState.playbackPosition = msg.playbackPosition;
+        systemController.SetChannel(msg.currentChannel);
+        systemController.RefreshScreen();
+    }
+
+    string ResolveMediaUrl(string mediaUrl)
+    {
+        if (string.IsNullOrWhiteSpace(mediaUrl)) return "";
+        if (mediaUrl.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
+            mediaUrl.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+            return mediaUrl;
+        if (mediaUrl.StartsWith("/"))
+            return $"{backendUrl.TrimEnd('/')}{mediaUrl}";
+        return $"{backendUrl.TrimEnd('/')}/{mediaUrl}";
     }
 
     // ── Helpers ───────────────────────────────────────────────────────────
@@ -236,7 +277,11 @@ class DeviceStateMsg
     public string modeCurrent;
     public string playbackStatus;
     public bool   playbackMuted;
+    public float  playbackPosition;
+    public string artworkUrl;
+    public string audioUrl;
     public string consoleApp;
+    public int currentChannel;
 }
 
 // ── HTTP response types (GET /api/devices) ────────────────────────────────
@@ -258,10 +303,13 @@ class DeviceDoc
     public ModeDoc         mode;
     public PlaybackDoc     playbackState;
     public ConsoleStateDoc consoleState;
+    public NavigationStateDoc navigationState;
 }
 
 [Serializable] class LevelDoc        { public float  current; }
 [Serializable] class ColorStateDoc   { public string mode; public float kelvin; public float hue; public float saturation; }
 [Serializable] class ModeDoc         { public string current; }
-[Serializable] class PlaybackDoc     { public string status; public bool isMuted; }
+[Serializable] class PlaybackDoc     { public string status; public bool isMuted; public float position; public NowPlayingDoc nowPlaying; }
+[Serializable] class NowPlayingDoc   { public string artworkUrl; public string audioUrl; }
 [Serializable] class ConsoleStateDoc { public string currentApp; }
+[Serializable] class NavigationStateDoc { public int currentChannel; }

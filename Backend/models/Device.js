@@ -83,11 +83,18 @@ const deviceSchema = new mongoose.Schema({
         },
         isMuted:  { type: Boolean, default: false },
         position: { type: Number, default: 0 },  // seconds into current media
+        nowPlaying: {
+            mediaId:    String,
+            title:      String,
+            artworkUrl: String,
+            audioUrl:   String,
+        },
     },
 
     // INavigatable
     navigationState: {
         cursorVisible: { type: Boolean, default: false },
+        currentChannel: { type: Number, default: 4 },
     },
 
     // IColorControllable

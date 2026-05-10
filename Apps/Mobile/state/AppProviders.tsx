@@ -1,6 +1,7 @@
 import React, { useEffect, useRef } from 'react';
 import { DebugProvider, useDebugStore } from './debug/store';
 import { DevicesProvider } from './devices/store';
+import { useDevicesStore } from './devices/store';
 import { LibraryProvider, useLibraryStore } from './library/store';
 import { PlaybackProvider, usePlaybackStore } from './playback/store';
 import { RepositoriesProvider, useRepositories } from './repositories/RepositoriesProvider';
@@ -8,6 +9,8 @@ import { RemoteDataProvider } from './remote-data/RemoteDataProvider';
 import { createMockTransport, setTransport } from '../services/transport';
 import { createSocketTransport } from '../services/transport/socket-transport';
 import { createHttpTransport } from '../services/transport/http-transport';
+import LibraryAudioPlayer from '../components/LibraryAudioPlayer';
+import PlaybackQueueController from '../components/PlaybackQueueController';
 import type {
   CommandLogEntry,
   ConsoleCommandEnvelope,
@@ -19,9 +22,12 @@ type StateRefs = {
   appendLog: (entry: CommandLogEntry) => void;
   notePlayed: ReturnType<typeof useLibraryStore>['notePlayed'];
   setNowPlaying: ReturnType<typeof usePlaybackStore>['setNowPlaying'];
+  clearNowPlaying: ReturnType<typeof usePlaybackStore>['clearNowPlaying'];
   enqueue: ReturnType<typeof usePlaybackStore>['enqueue'];
   setPlaying: ReturnType<typeof usePlaybackStore>['setPlaying'];
   setPosition: ReturnType<typeof usePlaybackStore>['setPosition'];
+  setInputSource: ReturnType<typeof useDevicesStore>['setInputSource'];
+  setCurrentApp: ReturnType<typeof useDevicesStore>['setCurrentApp'];
   getLatency: () => number;
   getFailRate: () => number;
 };
@@ -34,8 +40,20 @@ const applyEnvelopeSideEffects = (envelope: ConsoleCommandEnvelope, refs: StateR
     case 'PAUSE':
       refs.setPlaying(false);
       break;
+    case 'STOP':
+      refs.clearNowPlaying();
+      break;
     case 'SEEK_TO':
       if (typeof envelope.value === 'number') refs.setPosition(envelope.value);
+      break;
+    case 'SET_INPUT_SOURCE':
+      if (envelope.metadata?.subtitle) refs.setInputSource(envelope.deviceId, envelope.metadata.subtitle);
+      break;
+    case 'LAUNCH_APP':
+      if (envelope.metadata?.title) refs.setCurrentApp(envelope.deviceId, envelope.metadata.title);
+      break;
+    case 'GO_HOME':
+      refs.setCurrentApp(envelope.deviceId, '');
       break;
     case 'LIBRARY_PLAY':
     case 'LIBRARY_QUEUE':
@@ -47,6 +65,8 @@ const applyEnvelopeSideEffects = (envelope: ConsoleCommandEnvelope, refs: StateR
         title: envelope.metadata.title,
         subtitle: envelope.metadata.subtitle,
         durationSeconds: envelope.metadata.durationSeconds ?? 0,
+        artworkUrl: envelope.metadata?.artworkUrl,
+        audioUrl: envelope.metadata?.audioUrl,
       };
       if (envelope.command === 'LIBRARY_QUEUE') {
         refs.enqueue(mediaSummary);
@@ -56,6 +76,8 @@ const applyEnvelopeSideEffects = (envelope: ConsoleCommandEnvelope, refs: StateR
           title: mediaSummary.title,
           subtitle: mediaSummary.subtitle ?? '',
           durationSeconds: mediaSummary.durationSeconds,
+          artworkUrl: mediaSummary.artworkUrl,
+          audioUrl: mediaSummary.audioUrl,
         });
       } else if (envelope.command === 'LIBRARY_PLAY') {
         refs.setNowPlaying({
@@ -69,6 +91,8 @@ const applyEnvelopeSideEffects = (envelope: ConsoleCommandEnvelope, refs: StateR
           title: mediaSummary.title,
           subtitle: mediaSummary.subtitle ?? '',
           durationSeconds: mediaSummary.durationSeconds,
+          artworkUrl: mediaSummary.artworkUrl,
+          audioUrl: mediaSummary.audioUrl,
         });
       } else if (envelope.command === 'LIBRARY_PREVIEW') {
         refs.notePlayed({
@@ -77,6 +101,8 @@ const applyEnvelopeSideEffects = (envelope: ConsoleCommandEnvelope, refs: StateR
           title: mediaSummary.title,
           subtitle: mediaSummary.subtitle ?? '',
           durationSeconds: mediaSummary.durationSeconds,
+          artworkUrl: mediaSummary.artworkUrl,
+          audioUrl: mediaSummary.audioUrl,
         });
       }
       break;
@@ -88,6 +114,7 @@ const applyEnvelopeSideEffects = (envelope: ConsoleCommandEnvelope, refs: StateR
 
 function TransportBridge({ children }: { children: React.ReactNode }) {
   const debug = useDebugStore();
+  const devices = useDevicesStore();
   const library = useLibraryStore();
   const playback = usePlaybackStore();
   const { config } = useRepositories();
@@ -96,9 +123,12 @@ function TransportBridge({ children }: { children: React.ReactNode }) {
     appendLog: debug.appendLog,
     notePlayed: library.notePlayed,
     setNowPlaying: playback.setNowPlaying,
+    clearNowPlaying: playback.clearNowPlaying,
     enqueue: playback.enqueue,
     setPlaying: playback.setPlaying,
     setPosition: playback.setPosition,
+    setInputSource: devices.setInputSource,
+    setCurrentApp: devices.setCurrentApp,
     getLatency: () => debug.state.latencyMs,
     getFailRate: () => debug.state.failRate,
   });
@@ -107,18 +137,24 @@ function TransportBridge({ children }: { children: React.ReactNode }) {
     appendLog: debug.appendLog,
     notePlayed: library.notePlayed,
     setNowPlaying: playback.setNowPlaying,
+    clearNowPlaying: playback.clearNowPlaying,
     enqueue: playback.enqueue,
     setPlaying: playback.setPlaying,
     setPosition: playback.setPosition,
+    setInputSource: devices.setInputSource,
+    setCurrentApp: devices.setCurrentApp,
     getLatency: () => debug.state.latencyMs,
     getFailRate: () => debug.state.failRate,
   };
 
-  // Only switch to socket when both build-time config picks `socket` *and* the
-  // user hasn't forced mock mode in Settings. This makes Live mode safe to ship
-  // dark and lets the debug screen flip back to Mock without restarting.
-  const useSocket = debug.state.mode === 'live' && config.transportMode === 'socket';
-  const useHttp = config.transportMode === 'http';
+  // Live (Settings) + build-time transportMode choose the real backend path.
+  // Mock keeps everything local (latency/fail sliders apply). Build-time `mock`
+  // forces local-only regardless of the Live toggle.
+  const buildAllowsBackend =
+    config.transportMode === 'socket' || config.transportMode === 'http';
+  const useLiveBackend = debug.state.mode === 'live' && buildAllowsBackend;
+  const useSocket = useLiveBackend && config.transportMode === 'socket';
+  const useHttp = useLiveBackend && config.transportMode === 'http';
 
   useEffect(() => {
     let socketCleanup: (() => void) | null = null;
@@ -151,7 +187,7 @@ function TransportBridge({ children }: { children: React.ReactNode }) {
     return () => {
       socketCleanup?.();
     };
-  }, [useSocket, useHttp, config.backendUrl]);
+  }, [useSocket, useHttp, config.backendUrl, debug.state.mode]);
 
   return <>{children}</>;
 }
@@ -162,9 +198,13 @@ export function AppProviders({ children }: { children: React.ReactNode }) {
       <DebugProvider>
         <DevicesProvider>
           <PlaybackProvider>
+            <LibraryAudioPlayer />
             <LibraryProvider>
               <RemoteDataProvider>
-                <TransportBridge>{children}</TransportBridge>
+                <TransportBridge>
+                  <PlaybackQueueController />
+                  {children}
+                </TransportBridge>
               </RemoteDataProvider>
             </LibraryProvider>
           </PlaybackProvider>

@@ -43,7 +43,8 @@ export default function SettingsScreen() {
   const { config } = useRepositories();
 
   const failPercent = Math.round(failRate * 100);
-  const liveAvailable = config.transportMode === 'socket';
+  const liveAvailable =
+    config.transportMode === 'socket' || config.transportMode === 'http';
 
   const resetAll = () => {
     devices.reset();
@@ -78,7 +79,13 @@ export default function SettingsScreen() {
               />
               <ModeChip
                 label="Live"
-                description={liveAvailable ? `Socket → ${config.backendUrl}` : 'Disabled at build time'}
+                description={
+                  liveAvailable
+                    ? config.transportMode === 'socket'
+                      ? `Socket → ${config.backendUrl}`
+                      : `HTTP → ${config.backendUrl}`
+                    : 'Disabled at build time'
+                }
                 active={mode === 'live'}
                 disabled={!liveAvailable}
                 onPress={() => setMode('live')}
@@ -86,8 +93,10 @@ export default function SettingsScreen() {
             </View>
             <Text style={styles.helperText}>
               {liveAvailable
-                ? 'Switch to Live to send commands to the configured backend over the socket.'
-                : 'Set EXPO_PUBLIC_TRANSPORT_MODE=socket (or app.json extra) to enable Live mode.'}
+                ? config.transportMode === 'socket'
+                  ? 'Switch to Live to send commands over Socket.IO (same host as backend URL).'
+                  : 'Switch to Live to send commands with POST /api/commands and load devices/library over HTTP.'
+                : 'Set app.json extra.transportMode (or EXPO_PUBLIC_TRANSPORT_MODE) to http or socket to enable Live.'}
             </Text>
           </Section>
 

@@ -42,6 +42,7 @@ const toRecent = (item: MediaItem | RecentMediaRef, progress?: number): RecentMe
   subtitle: item.subtitle,
   durationSeconds: item.durationSeconds,
   artworkUrl: item.artworkUrl,
+  ...('audioUrl' in item && item.audioUrl ? { audioUrl: item.audioUrl } : {}),
   progress,
 });
 

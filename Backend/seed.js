@@ -38,7 +38,7 @@ const devices = [
     },
     // Apps + consoles (matches SetTVApp / SetConsole in ScreenTextInput.cs)
     consoleState: {
-      currentApp: 'Netflix',
+      currentApp: '',
       availableApps: [
         { id: 'Netflix',     label: 'Netflix' },
         { id: 'Prime Video', label: 'Prime Video' },
@@ -48,6 +48,10 @@ const devices = [
         { id: 'PlayStation', label: 'PlayStation' },
         { id: 'Switch',      label: 'Switch' },
       ],
+    },
+    navigationState: {
+      cursorVisible: false,
+      currentChannel: 4,
     },
     playbackState: { status: 'stopped', isMuted: false, position: 0 },
   },

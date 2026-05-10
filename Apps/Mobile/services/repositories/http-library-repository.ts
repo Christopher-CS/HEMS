@@ -12,7 +12,9 @@ export function createHttpLibraryRepository({
 }: HttpLibraryRepositoryOptions): LibraryRepository {
   return {
     async fetchLibrary(): Promise<LibraryPayload> {
-      const response = await fetchImpl(`${baseUrl}/api/library`);
+      const response = await fetchImpl(`${baseUrl}/api/library`, {
+        headers: { 'X-HEMS-Client': 'mobile-app' },
+      });
       if (!response.ok) {
         throw new Error(`Library request failed: ${response.status}`);
       }

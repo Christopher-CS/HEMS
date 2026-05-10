@@ -1,7 +1,7 @@
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { Image } from 'expo-image';
-import { ListPlus, Play, Volume2 } from 'lucide-react-native';
+import { ListPlus, Play } from 'lucide-react-native';
 import COLORS from '../../constants/Colors';
 import { formatDuration } from '../../data/media-library';
 import type { LibraryActionType, MediaItem } from '../../types/media';
@@ -76,11 +76,6 @@ export default function MediaCard({
           label="Queue"
           icon={<ListPlus color={COLORS.textMutedLight} size={16} />}
           onPress={() => onAction('QUEUE')}
-        />
-        <SecondaryAction
-          label="Preview"
-          icon={<Volume2 color={COLORS.textMutedLight} size={16} />}
-          onPress={() => onAction('PREVIEW')}
         />
       </View>
     </View>

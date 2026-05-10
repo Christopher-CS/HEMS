@@ -12,7 +12,7 @@ export default function LibraryLayout() {
     >
       <Stack.Screen name="index" />
       <Stack.Screen name="music" />
-      <Stack.Screen name="movies" />
+      <Stack.Screen name="smart-menu" />
       <Stack.Screen name="podcasts" />
     </Stack>
   );

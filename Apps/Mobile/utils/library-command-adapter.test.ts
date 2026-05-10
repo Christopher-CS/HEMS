@@ -1,5 +1,5 @@
 import { buildLibraryCommand } from './library-command-adapter';
-import type { MusicTrack, RecentMediaRef } from '../types/media';
+import type { MusicTrack, PodcastEpisode, RecentMediaRef } from '../types/media';
 
 const TRACK: MusicTrack = {
   id: 'track-001',
@@ -11,13 +11,24 @@ const TRACK: MusicTrack = {
   durationSeconds: 214,
 };
 
+const PODCAST: PodcastEpisode = {
+  id: 'pod-003',
+  category: 'podcasts',
+  title: "Alzheimer's and the Brain",
+  subtitle: 'VSauce',
+  showName: 'VSauce',
+  durationSeconds: 901,
+  audioUrl: "/podcast/VSauce - Alzheimer's and the Brain.mp3",
+};
+
 const RECENT: RecentMediaRef = {
-  id: 'movie-002',
-  category: 'movies',
-  title: 'Orbital',
-  subtitle: 'Paused at 47m',
-  durationSeconds: 8040,
-  progress: 0.35,
+  id: 'pod-003',
+  category: 'podcasts',
+  title: "Alzheimer's and the Brain",
+  subtitle: 'VSauce',
+  durationSeconds: 901,
+  audioUrl: "/podcast/VSauce - Alzheimer's and the Brain.mp3",
+  progress: 0.22,
 };
 
 describe('buildLibraryCommand', () => {
@@ -37,6 +48,11 @@ describe('buildLibraryCommand', () => {
     });
   });
 
+  it('includes audioUrl for podcast playback too', () => {
+    const envelope = buildLibraryCommand('PLAY', PODCAST, 'living-room-tv', PODCAST.durationSeconds);
+    expect(envelope.metadata?.audioUrl).toBe("/podcast/VSauce - Alzheimer's and the Brain.mp3");
+  });
+
   it('maps QUEUE and PREVIEW to their LIBRARY_* tokens', () => {
     expect(buildLibraryCommand('QUEUE', TRACK, 'sound-system').command).toBe('LIBRARY_QUEUE');
     expect(buildLibraryCommand('PREVIEW', TRACK, 'sound-system').command).toBe('LIBRARY_PREVIEW');
@@ -49,8 +65,9 @@ describe('buildLibraryCommand', () => {
 
   it('accepts RecentMediaRef inputs without losing category metadata', () => {
     const envelope = buildLibraryCommand('PLAY', RECENT, 'living-room-tv', RECENT.durationSeconds);
-    expect(envelope.category).toBe('movies');
-    expect(envelope.mediaId).toBe('movie-002');
-    expect(envelope.metadata?.subtitle).toBe('Paused at 47m');
+    expect(envelope.category).toBe('podcasts');
+    expect(envelope.mediaId).toBe('pod-003');
+    expect(envelope.metadata?.subtitle).toBe('VSauce');
+    expect(envelope.metadata?.audioUrl).toBe("/podcast/VSauce - Alzheimer's and the Brain.mp3");
   });
 });

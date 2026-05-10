@@ -2,6 +2,9 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { useRepositories } from '../repositories/RepositoriesProvider';
 import { useDevicesStore } from '../devices/store';
 import { useLibraryStore } from '../library/store';
+import { usePlaybackStore } from '../playback/store';
+import type { PlaybackProjection } from '../../services/repositories';
+import { resolveRemoteNowPlaying } from '../../utils/resolve-remote-playback';
 
 type Status = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -54,40 +57,76 @@ export function RemoteDataProvider({ children }: { children: React.ReactNode }) 
   const { repositories, config } = useRepositories();
   const library = useLibraryStore();
   const devices = useDevicesStore();
+  const playback = usePlaybackStore();
   const [state, dispatch] = useReducer(reducer, INITIAL_STATE);
+  const playbackRef = useRef<PlaybackProjection | null>(null);
 
   const refsRef = useRef({
     libraryHydrate: library.hydrate,
     devicesHydrate: devices.hydrate,
+    libraryState: library.state,
+    playbackCurrent: playback.state.current,
+    playbackSetNowPlaying: playback.setNowPlaying,
+    playbackClearNowPlaying: playback.clearNowPlaying,
   });
   refsRef.current = {
     libraryHydrate: library.hydrate,
     devicesHydrate: devices.hydrate,
+    libraryState: library.state,
+    playbackCurrent: playback.state.current,
+    playbackSetNowPlaying: playback.setNowPlaying,
+    playbackClearNowPlaying: playback.clearNowPlaying,
   };
+
+  const syncPlayback = useCallback(
+    (projection: PlaybackProjection | null, libraryState = refsRef.current.libraryState) => {
+      playbackRef.current = projection;
+      const next = resolveRemoteNowPlaying(
+        projection,
+        libraryState,
+        refsRef.current.playbackCurrent
+      );
+
+      if (next) {
+        refsRef.current.playbackSetNowPlaying(next);
+      } else {
+        refsRef.current.playbackClearNowPlaying();
+      }
+    },
+    []
+  );
 
   const refreshLibrary = useCallback(async () => {
     dispatch({ type: 'library:start' });
     try {
       const payload = await repositories.library.fetchLibrary();
+      const mergedLibrary = {
+        ...refsRef.current.libraryState,
+        ...payload,
+      };
       refsRef.current.libraryHydrate(payload);
+      if (playbackRef.current && playbackRef.current.status !== 'stopped') {
+        syncPlayback(playbackRef.current, mergedLibrary);
+      }
       dispatch({ type: 'library:success' });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load library';
       dispatch({ type: 'library:error', error: message });
     }
-  }, [repositories.library]);
+  }, [repositories.library, syncPlayback]);
 
   const refreshDevices = useCallback(async () => {
     dispatch({ type: 'devices:start' });
     try {
-      const projections = await repositories.devices.fetchDevices();
-      refsRef.current.devicesHydrate(projections);
+      const result = await repositories.devices.fetchDevices();
+      refsRef.current.devicesHydrate(result.projections);
+      syncPlayback(result.playback);
       dispatch({ type: 'devices:success' });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load devices';
       dispatch({ type: 'devices:error', error: message });
     }
-  }, [repositories.devices]);
+  }, [repositories.devices, syncPlayback]);
 
   useEffect(() => {
     if (config.librarySource === 'http') {
@@ -104,6 +143,12 @@ export function RemoteDataProvider({ children }: { children: React.ReactNode }) 
       dispatch({ type: 'devices:success' });
     }
   }, [config.devicesSource, refreshDevices]);
+
+  useEffect(() => {
+    if (playbackRef.current && playbackRef.current.status !== 'stopped') {
+      syncPlayback(playbackRef.current, library.state);
+    }
+  }, [library.state, syncPlayback]);
 
   const value = useMemo<RemoteDataContextValue>(
     () => ({ state, refreshLibrary, refreshDevices }),

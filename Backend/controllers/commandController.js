@@ -10,12 +10,16 @@ export const capabilityMap = {
     setLevel:     "levelAdjustable",
     incrementLevel: "levelAdjustable",
     decrementLevel: "levelAdjustable",
+    incrementChannel: "navigatable",
+    decrementChannel: "navigatable",
+    setChannel: "navigatable",
     setMode:      "modeSelectable",
     cycleMode:    "modeSelectable",
     move:         "moveable",
     launchApp:    "consoleControllable",
     // new
     playback:           "playbackControllable",
+    playMedia:          "playbackControllable",
     toggleMute:         "playbackControllable",
     navigate:           "navigatable",
     setColorMode:       "colorControllable",
@@ -39,6 +43,14 @@ export const payloadValidators = {
     },
     incrementLevel: () => {},
     decrementLevel: () => {},
+    incrementChannel: () => {},
+    decrementChannel: () => {},
+    setChannel: (payload) => {
+        const value = payload?.channel;
+        if (value == null) throw new Error("Missing channel");
+        if (!Number.isInteger(value) || value < 1 || value > 999)
+            throw new Error("Channel must be an integer between 1 and 999");
+    },
     setMode: (payload, device) => {
         const valid = device.mode.available.map(m => m.id);
         if (!payload?.mode) throw new Error("Missing mode");
@@ -60,7 +72,7 @@ export const payloadValidators = {
     },
     // new
     playback: (payload) => {
-        const valid = ["play", "pause", "stop", "fastforward", "rewind"];
+        const valid = ["play", "pause", "stop", "fastforward", "rewind", "seek"];
         if (!valid.includes(payload?.action))
         throw new Error(`Invalid playback action. Valid: ${valid.join(", ")}`);
     },
@@ -89,13 +101,24 @@ export const payloadValidators = {
         if (s == null) throw new Error("Missing saturation value");
         if (s < 0 || s > 100) throw new Error("Saturation must be between 0 and 100");
     },
+    playMedia: (payload) => {
+        if (!payload?.mediaId) throw new Error("Missing mediaId");
+    },
 };
 
 export const applyPayload = {
     // existing
-    power:     (payload, device) => { device.powerState = payload.powerState; },
+    power:     (payload, device) => {
+        device.powerState = payload.powerState;
+        if (device.type === 'tv' && payload.powerState === 'on') {
+            device.consoleState.currentApp = '';
+        }
+    },
     togglePower: (_, device) => {
         device.powerState = device.powerState === "off" ? "on" : "off";
+        if (device.type === 'tv' && device.powerState === 'on') {
+            device.consoleState.currentApp = '';
+        }
     },
     setLevel:  (payload, device) => { device.level.current = payload.value; },
     incrementLevel: (_, device) => {
@@ -103,6 +126,20 @@ export const applyPayload = {
     },
     decrementLevel: (_, device) => {
         device.level.current = Math.max(device.level.current - device.level.step, device.level.min);
+    },
+    incrementChannel: (_, device) => {
+        if (!device.navigationState) device.navigationState = {};
+        const current = device.navigationState?.currentChannel ?? 4;
+        device.navigationState.currentChannel = Math.min(current + 1, 999);
+    },
+    decrementChannel: (_, device) => {
+        if (!device.navigationState) device.navigationState = {};
+        const current = device.navigationState?.currentChannel ?? 4;
+        device.navigationState.currentChannel = Math.max(current - 1, 1);
+    },
+    setChannel: (payload, device) => {
+        if (!device.navigationState) device.navigationState = {};
+        device.navigationState.currentChannel = payload.channel;
     },
     setMode:   (payload, device) => { device.mode.current = payload.mode; },
     cycleMode: (_, device) => {
@@ -121,16 +158,36 @@ export const applyPayload = {
         fastforward: "fast-forwarding",
         rewind:      "rewinding",
         };
-        device.playbackState.status = statusMap[payload.action];
+        if (statusMap[payload.action]) {
+            device.playbackState.status = statusMap[payload.action];
+        }
+        if (payload.action === 'seek' && typeof payload.positionSeconds === 'number') {
+            device.playbackState.position = payload.positionSeconds;
+        }
     },
     toggleMute: (_, device) => {
         device.playbackState.isMuted = !device.playbackState.isMuted;
     },
-    navigate: () => {},
+    navigate: (payload, device) => {
+        if (device.type !== 'tv') return;
+        if (payload?.direction === 'home' && device.consoleState) {
+            device.consoleState.currentApp = '';
+        }
+    },
     setColorMode:        (payload, device) => { device.colorState.mode = payload.mode; },
     setColorTemperature: (payload, device) => { device.colorState.kelvin = payload.kelvin; },
     setHue:              (payload, device) => { device.colorState.hue = payload.hue; },
     setSaturation:       (payload, device) => { device.colorState.saturation = payload.saturation; },
+    playMedia: (payload, device) => {
+        device.playbackState.status = "playing";
+        device.playbackState.position = 0;
+        device.playbackState.nowPlaying = {
+            mediaId: payload.mediaId,
+            title: payload.metadata?.title,
+            artworkUrl: payload.metadata?.artworkUrl,
+            audioUrl: payload.metadata?.audioUrl,
+        };
+    },
 };
 
 
@@ -159,6 +216,30 @@ export const executeCommand = async (req, res) => {
         deviceDoc.lastSeen = new Date();
         await deviceDoc.save();
 
+        if (
+            deviceDoc.slug === 'living-room-tv' &&
+            (type === 'power' || type === 'togglePower')
+        ) {
+            console.log(`[TV POWER] slug=${deviceDoc.slug} powerState=${deviceDoc.powerState}`);
+        }
+
+        if (deviceDoc.slug === 'living-room-tv' && type === 'playMedia') {
+            console.log(
+                `[TV PLAYBACK] slug=${deviceDoc.slug} mediaId=${deviceDoc.playbackState?.nowPlaying?.mediaId ?? ''} ` +
+                `status=${deviceDoc.playbackState?.status ?? 'stopped'} ` +
+                `audioUrl=${deviceDoc.playbackState?.nowPlaying?.audioUrl ?? ''} ` +
+                `artworkUrl=${deviceDoc.playbackState?.nowPlaying?.artworkUrl ?? ''}`
+            );
+        }
+
+        if (deviceDoc.slug === 'living-room-tv' && type === 'playback') {
+            console.log(
+                `[TV PLAYBACK] slug=${deviceDoc.slug} status=${deviceDoc.playbackState?.status ?? 'stopped'} ` +
+                `position=${deviceDoc.playbackState?.position ?? 0} ` +
+                `audioUrl=${deviceDoc.playbackState?.nowPlaying?.audioUrl ?? ''}`
+            );
+        }
+
         status = "executed";
 
         broadcast({
@@ -173,7 +254,11 @@ export const executeCommand = async (req, res) => {
             modeCurrent: deviceDoc.mode?.current ?? '',
             playbackStatus: deviceDoc.playbackState?.status ?? 'stopped',
             playbackMuted: deviceDoc.playbackState?.isMuted ?? false,
+            playbackPosition: deviceDoc.playbackState?.position ?? 0,
+            artworkUrl: deviceDoc.playbackState?.nowPlaying?.artworkUrl ?? '',
+            audioUrl: deviceDoc.playbackState?.nowPlaying?.audioUrl ?? '',
             consoleApp: deviceDoc.consoleState?.currentApp ?? '',
+            currentChannel: deviceDoc.navigationState?.currentChannel ?? 4,
         });
 
         const command = await Command.create({

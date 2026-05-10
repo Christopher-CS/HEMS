@@ -256,7 +256,7 @@ export default function DeviceDetailModal(props: Props) {
               </View>
             )}
 
-            {device.availableSources && device.availableSources.length > 0 && (
+            {device.kind !== 'tv' && device.availableSources && device.availableSources.length > 0 && (
               <View style={styles.section}>
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>Input Source</Text>

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   FlatList,
   Pressable,
@@ -15,8 +15,10 @@ import COLORS from '../../constants/Colors';
 import { formatDuration } from '../../data/media-library';
 import { useDevices } from '../../hooks/useDevices';
 import { useLibrary } from '../../hooks/useLibrary';
+import { usePlayback } from '../../hooks/usePlayback';
 import { useTransport } from '../../hooks/useTransport';
 import { buildLibraryCommand } from '../../utils/library-command-adapter';
+import { toQueuedMedia } from '../../utils/library-queue';
 import type { PodcastEpisode } from '../../types/media';
 
 const ACCENT = COLORS.purple;
@@ -26,6 +28,7 @@ export default function PodcastsPage() {
   const [activeShow, setActiveShow] = useState<string>('All');
   const { podcasts, loading, error, refresh } = useLibrary();
   const { primaryDeviceId } = useDevices();
+  const { enqueue } = usePlayback();
   const { send } = useTransport();
 
   const shows = useMemo(() => {
@@ -47,6 +50,19 @@ export default function PodcastsPage() {
     });
   }, [query, activeShow, podcasts]);
 
+  const handleAction = useCallback(
+    (action: 'PLAY' | 'QUEUE' | 'PREVIEW', item: PodcastEpisode) => {
+      if (action === 'QUEUE') {
+        enqueue(toQueuedMedia(item, item.durationSeconds));
+        return;
+      }
+
+      const envelope = buildLibraryCommand(action, item, primaryDeviceId, item.durationSeconds);
+      send(envelope).catch(() => {});
+    },
+    [enqueue, primaryDeviceId, send]
+  );
+
   const renderItem = ({ item }: { item: PodcastEpisode }) => (
     <MediaCard
       item={item}
@@ -57,10 +73,7 @@ export default function PodcastsPage() {
           : item.showName,
         `${formatDuration(item.durationSeconds)}${item.publishedOn ? ` · ${item.publishedOn}` : ''}`,
       ]}
-      onAction={(action) => {
-        const envelope = buildLibraryCommand(action, item, primaryDeviceId, item.durationSeconds);
-        send(envelope).catch(() => {});
-      }}
+      onAction={(action) => handleAction(action, item)}
     />
   );
 
